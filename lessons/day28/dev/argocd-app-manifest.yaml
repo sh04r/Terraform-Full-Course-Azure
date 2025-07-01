@@ -1,17 +1,17 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: goal-tracker-dev
-  namespace: argocd
+  name: guestbook-${ENVIRONMENT}
+  namespace: ${ARGOCD_NAMESPACE}
 spec:
   project: default
   source:
-    repoURL: https://github.com/itsbaivab/gitops-configs.git
+    repoURL: https://github.com/argoproj/argocd-example-apps.git
     targetRevision: HEAD
-    path: environments/dev
+    path: guestbook
   destination:
     server: https://kubernetes.default.svc
-    namespace: goal-tracker
+    namespace: guestbook-${ENVIRONMENT}
   syncPolicy:
     automated:
       prune: true

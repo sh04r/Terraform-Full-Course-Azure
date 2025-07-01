@@ -49,14 +49,24 @@ resource "helm_release" "argocd" {
     value = "{--insecure}"
   }
 
-  # Resource limits for stability
+  # Enhanced resource limits for test environment
   set {
     name  = "server.resources.limits.cpu"
-    value = "500m"
+    value = "1000m" # Increased for test
   }
 
   set {
     name  = "server.resources.limits.memory"
+    value = "1Gi" # Increased for test
+  }
+
+  set {
+    name  = "server.resources.requests.cpu"
+    value = "500m"
+  }
+
+  set {
+    name  = "server.resources.requests.memory"
     value = "512Mi"
   }
 

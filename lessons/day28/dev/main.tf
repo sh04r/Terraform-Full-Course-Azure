@@ -31,10 +31,6 @@ resource "azurerm_resource_group" "main" {
   location = var.location
   tags     = local.common_tags
 
-  # Prevent accidental deletion
-  lifecycle {
-    prevent_destroy = true
-  }
 }
 
 # AKS cluster with improved configuration
@@ -44,7 +40,7 @@ resource "azurerm_kubernetes_cluster" "main" {
   resource_group_name = azurerm_resource_group.main.name
   dns_prefix          = "${var.kubernetes_cluster_name}-${var.environment}"
 
-  # Use explicit node resource group name
+  # Use explicit node resource group name (this prevents circular dependencies)
   node_resource_group = local.infra_nodes_rg_name
   kubernetes_version  = var.kubernetes_version
 
@@ -57,7 +53,6 @@ resource "azurerm_kubernetes_cluster" "main" {
 
   default_node_pool {
     name                        = "default"
-    node_count                  = var.node_count
     os_disk_size_gb             = 30
     vm_size                     = var.vm_size
     temporary_name_for_rotation = "tmpdefault"
@@ -85,8 +80,11 @@ resource "azurerm_kubernetes_cluster" "main" {
 
   azure_active_directory_role_based_access_control {
     tenant_id          = data.azurerm_client_config.current.tenant_id
-    azure_rbac_enabled = true
+    azure_rbac_enabled = false
   }
+
+  # Enable local accounts for admin access (required for Terraform automation)
+  local_account_disabled = false
 
   key_vault_secrets_provider {
     secret_rotation_enabled = true
@@ -104,14 +102,47 @@ resource "azurerm_kubernetes_cluster" "main" {
       kubernetes_version,
       default_node_pool[0].orchestrator_version
     ]
-    prevent_destroy = true
   }
 
   tags = local.common_tags
 }
 
-# Wait for cluster to be fully ready before proceeding
+# Role assignment for the current user to have admin access to the cluster
+resource "azurerm_role_assignment" "aks_admin" {
+  scope                = azurerm_kubernetes_cluster.main.id
+  role_definition_name = "Azure Kubernetes Service Cluster Admin Role"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
+# Role assignment for the AKS managed identity to pull images from ACR (if using ACR)
+# resource "azurerm_role_assignment" "aks_acr_pull" {
+#   count                = 0 # Enable this if you're using ACR
+#   scope                = "/subscriptions/${data.azurerm_client_config.current.subscription_id}"
+#   role_definition_name = "AcrPull"
+#   principal_id         = azurerm_kubernetes_cluster.main.kubelet_identity[0].object_id
+# }
+
+# Role assignment for cluster managed identity to manage cluster resources
+resource "azurerm_role_assignment" "aks_identity_operator" {
+  scope                = azurerm_resource_group.main.id
+  role_definition_name = "Managed Identity Operator"
+  principal_id         = azurerm_kubernetes_cluster.main.identity[0].principal_id
+}
+
+# Role assignment for cluster managed identity to manage network resources
+resource "azurerm_role_assignment" "aks_network_contributor" {
+  scope                = azurerm_resource_group.main.id
+  role_definition_name = "Network Contributor"
+  principal_id         = azurerm_kubernetes_cluster.main.identity[0].principal_id
+}
+
+# Wait for cluster to be fully ready before proceeding with Kubernetes resources
 resource "time_sleep" "wait_for_cluster" {
-  depends_on      = [azurerm_kubernetes_cluster.main]
-  create_duration = "60s"
+  depends_on = [
+    azurerm_kubernetes_cluster.main,
+    azurerm_role_assignment.aks_admin,
+    azurerm_role_assignment.aks_identity_operator,
+    azurerm_role_assignment.aks_network_contributor
+  ]
+  create_duration = "60s" # Wait 60 seconds for cluster and RBAC to be ready
 }

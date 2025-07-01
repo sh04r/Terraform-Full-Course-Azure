@@ -1,9 +1,8 @@
 environment             = "prod"
-location                = "westus2"
+location                = "eastus"
 resource_group_name     = "aks-gitops-rg"
 kubernetes_cluster_name = "aks-gitops-cluster"
-node_count              = 3
-vm_size                 = "Standard_D4s_v3"
+vm_size                 = "Standard_D8s_v3" # Upgraded VM size for production (8 vCPUs, 32GB RAM)
 kubernetes_version      = "1.32.5"
 gitops_repo_url         = "https://github.com/itsbaivab/gitops-configs.git"
 argocd_namespace        = "argocd"

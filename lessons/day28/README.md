@@ -8,8 +8,9 @@ This repository provides a production-ready setup for deploying applications to 
 
 - [Architecture Overview](#-architecture-overview)
 - [Prerequisites](#-prerequisites)
-- [Initial Setup](#-initial-setup)
-- [Step-by-Step Deployment](#-step-by-step-deployment)
+- [Quick Start](#-quick-start)
+- [Accessing ArgoCD WebUI](#-accessing-argocd-webui)
+- [Deploying Applications](#-deploying-applications)
 - [Verification](#-verification)
 - [Troubleshooting](#-troubleshooting)
 - [Clean Up](#-clean-up)
@@ -19,279 +20,717 @@ This repository provides a production-ready setup for deploying applications to 
 ## 🏗️ Architecture Overview
 
 ### Components
-- **Infrastructure**: Azure Kubernetes Service (AKS) clusters
-- **GitOps Platform**: ArgoCD for continuous deployment
-- **State Management**: Terraform with Azure Storage backend
-- **Application**: Goal Tracker (Frontend + Backend + PostgreSQL)
-- **Environments**: Dev, Test, Production isolation
 
-### Directory Structure
-```
-├── dev/                    # Dev environment Terraform
-├── test/                   # Test environment Terraform  
-├── prod/                   # Prod environment Terraform
-├── gitops-configs/         # GitOps application configs
-│   ├── apps/goal-tracker/  # Application manifests
-│   └── environments/       # Environment-specific configs
-└── docker-local-deployment/ # Local development
+- **Infrastructure**: Azure Kubernetes Service (AKS) with auto-scaling
+- **GitOps Platform**: ArgoCD for continuous deployment
+- **State Management**: Terraform with remote state (optional)
+- **Authentication**: Azure AD integration with local admin accounts
+- **Networking**: Azure CNI with network policies
+
+### Environment Structure
+
+```text
+.
+├── dev                     dev env
+│   ├── argocd-app-manifest.yaml
+│   ├── backend.tf
+│   ├── backend.tf.example
+│   ├── deploy-argocd-app.sh
+│   ├── kubernetes-resources.tf
+│   ├── main.tf
+│   ├── outputs.tf
+│   ├── provider.tf
+│   ├── terraform.tfvars
+│   ├── validate-deployment.sh
+│   └── variables.tf
+├── prod           #prod env
+│   ├── argocd-app-manifest.yaml
+│   ├── backend.tf
+│   ├── backend.tf.example
+│   ├── deploy-argocd-app.sh
+│   ├── kubernetes-resources.tf
+│   ├── main.tf
+│   ├── outputs.tf
+│   ├── provider.tf
+│   ├── terraform.tfvars
+│   └── variables.tf
+├── README.md
+└── test            #testing env
+    ├── argocd-app-manifest.yaml
+    ├── backend.tf
+    ├── backend.tf.example
+    ├── deploy-argocd-app.sh
+    ├── kubernetes-resources.tf
+    ├── main.tf
+    ├── outputs.tf
+    ├── provider.tf
+    ├── terraform.tfvars
+    └── variables.tf
+
 ```
 
 ---
 
 ## ✅ Prerequisites
 
-### 1. Required Tools
+### 1. Essential Tools (Required)
+
 ```bash
-# Install Azure CLI
+# Install Azure CLI (Required for authentication and service principal)
 curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 
-# Install Terraform
-wget https://releases.hashicorp.com/terraform/1.12.1/terraform_1.12.1_linux_amd64.zip
-unzip terraform_1.12.1_linux_amd64.zip
-sudo mv terraform /usr/local/bin/
+# Install Terraform (latest) (Required to deploy infrastructure)
+sudo apt-get update && sudo apt-get install -y gnupg software-properties-common
+wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+sudo apt update && sudo apt install terraform
+```
 
-# Install kubectl
+### 2. Optional Tools (for manual management)
+
+```bash
+# Install kubectl (for manual cluster operations - Terraform handles K8s deployment)
 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
 sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
-# Install Helm
-sudo snap install helm --classic
-
-# Install kubelogin for Azure AD
-curl -LO "https://github.com/Azure/kubelogin/releases/latest/download/kubelogin-linux-amd64.zip"
-unzip kubelogin-linux-amd64.zip
-sudo cp bin/linux_amd64/kubelogin /usr/local/bin/
+# Install Helm (for manual chart operations - Terraform uses Helm provider)
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 ```
 
-### 2. Azure Authentication
+> **Note:** Terraform automatically handles ArgoCD installation, Kubernetes resources, and application deployment via providers. You only need kubectl/helm for manual troubleshooting and verification.
+
+### 3. Azure Authentication & Service Principal
+
+#### Step 1: Login to Azure
 ```bash
 # Login to Azure
 az login
 
-# Set your subscription (replace with your subscription ID)
+# Set your subscription
 az account set --subscription "your-subscription-id"
 
-# Verify login
+# Verify authentication
 az account show
 ```
 
-### 3. SSH Key (Optional)
+#### Step 2: Create Service Principal for Terraform
 ```bash
-# Generate SSH key for AKS nodes (optional)
+# Get your subscription ID
+SUBSCRIPTION_ID=$(az account show --query id --output tsv)
+echo "Subscription ID: $SUBSCRIPTION_ID"
+
+# Create service principal with Contributor role
+az ad sp create-for-rbac \
+  --name "terraform-aks-gitops" \
+  --role "Contributor" \
+  --scopes "/subscriptions/$SUBSCRIPTION_ID" \
+  --sdk-auth
+
+# Save the output - you'll need these values for Terraform authentication:
+# {
+#   "clientId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+#   "clientSecret": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+#   "subscriptionId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+#   "tenantId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+# }
+```
+
+#### Step 3: Configure Terraform Authentication
+
+**Option A: Environment Variables (Recommended)**
+```bash
+# Export service principal credentials
+export ARM_CLIENT_ID="your-client-id"
+export ARM_CLIENT_SECRET="your-client-secret"
+export ARM_SUBSCRIPTION_ID="your-subscription-id"
+export ARM_TENANT_ID="your-tenant-id"
+
+# Verify Terraform can authenticate
+terraform version
+```
+
+**Option B: Azure CLI Authentication (Alternative)**
+```bash
+# If you prefer to use Azure CLI authentication instead of service principal
+az login
+az account set --subscription "your-subscription-id"
+```
+
+### 4. SSH Key (Optional)
+
+```bash
+# Generate SSH key for node access (optional)
 ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_azure -N ""
 ```
 
 ---
 
-## 🔧 Initial Setup
+## ⚡ Quick Start
 
-### 1. Clone Repository
+### Step 1: Set Up Authentication
+
 ```bash
-git clone <your-repo-url>
-cd Terraform-Full-Course-Azure/lessons/day28
+# Option A: Using Service Principal (Recommended for automation)
+export ARM_CLIENT_ID="your-client-id"
+export ARM_CLIENT_SECRET="your-client-secret"
+export ARM_SUBSCRIPTION_ID="your-subscription-id"
+export ARM_TENANT_ID="your-tenant-id"
+
+# Option B: Using Azure CLI (Alternative)
+az login
+az account set --subscription "your-subscription-id"
 ```
 
-### 2. Prepare Docker Images (Optional)
-If you want to deploy the Goal Tracker application:
-```bash
-# Build and push your application images
-cd docker-local-deployment
-docker build -t yourusername/frontend:latest ./frontend
-docker build -t yourusername/backend:latest ./backend
-
-docker push yourusername/frontend:latest
-docker push yourusername/backend:latest
-```
-
-### 3. Configure Terraform Variables
-Edit the `terraform.tfvars` files in each environment:
+### Step 2: Configure Remote State Backend (Optional but Recommended)
 
 ```bash
-# dev/terraform.tfvars
-environment             = "dev"
-location                = "eastus"
-resource_group_name     = "aks-gitops-rg"
-kubernetes_cluster_name = "aks-gitops-cluster"
-node_count              = 2
-vm_size                 = "Standard_D2s_v3"
-kubernetes_version      = "1.32.5"
-gitops_repo_url         = "https://github.com/yourusername/gitops-configs.git"
-argocd_namespace        = "argocd"
-
-tags = {
-  Environment = "development"
-  Project     = "AKS-GitOps"
-  ManagedBy   = "Terraform"
-}
-```
-
----
-
-## 🚀 Step-by-Step Deployment
-
-### Step 1: Deploy Development Environment
-
-```bash
+# Navigate to dev environment
 cd dev/
 
-# Remove remote backend temporarily (to avoid state locking issues)
-mv backend.tf backend.tf.backup
+# Option A: Use local state (for testing)
+# Skip this step - Terraform will use local state by default
 
-# Initialize Terraform
-terraform init
+# Option B: Configure Azure Storage Backend (for production)
+# Copy the example backend configuration
+cp backend.tf.example backend.tf
 
-# Plan the deployment
-terraform plan -out=tfplan
-
-# Apply infrastructure
-terraform apply tfplan
-
-# Wait for cluster to be ready
-terraform output
+# Edit backend.tf with your Azure Storage Account details
+# You'll need to create these resources first or use existing ones
 ```
 
-### Step 2: Configure kubectl Access
+**To set up Azure Storage Backend:**
 
 ```bash
-# Get cluster credentials
+# Create resource group for Terraform state
+az group create --name "rg-terraform-state" --location "East US"
+
+# Create storage account (name must be globally unique)
+STORAGE_ACCOUNT_NAME="tfstate$(date +%s)"
+az storage account create \
+  --resource-group "rg-terraform-state" \
+  --name "$STORAGE_ACCOUNT_NAME" \
+  --sku "Standard_LRS" \
+  --encryption-services blob
+
+# Create storage container
+az storage container create \
+  --name "tfstate" \
+  --account-name "$STORAGE_ACCOUNT_NAME"
+
+# Update backend.tf with your values
+echo "Update backend.tf with these values:"
+echo "resource_group_name  = \"rg-terraform-state\""
+echo "storage_account_name = \"$STORAGE_ACCOUNT_NAME\""
+echo "container_name       = \"tfstate\""
+echo "key                  = \"dev/terraform.tfstate\""
+```
+
+### Step 3: Deploy Development Environment
+
+```bash
+# Initialize Terraform (this will configure the backend if using remote state)
+terraform init
+
+# Review what will be created
+terraform plan
+
+# Deploy infrastructure (takes 5-10 minutes)
+terraform apply -auto-approve
+```
+
+> **What Terraform Deploys Automatically:**
+> - ✅ AKS cluster with auto-scaling
+> - ✅ ArgoCD installation via Helm
+> - ✅ Azure AD integration and RBAC
+> - ✅ Network policies and security groups
+> - ✅ Sample guestbook application via GitOps
+
+### Step 4: Configure kubectl Access
+
+```bash
+# Get cluster credentials using admin access
 az aks get-credentials \
   --resource-group $(terraform output -raw resource_group_name) \
   --name $(terraform output -raw aks_cluster_name) \
   --admin \
   --overwrite-existing
 
-# Convert kubeconfig for Azure AD (if using RBAC)
-kubelogin convert-kubeconfig -l azurecli
-
-# Verify connection
+# Verify cluster connectivity
 kubectl get nodes
+kubectl get namespaces
 ```
 
-### Step 3: Install ArgoCD
+### Step 5: Verify ArgoCD Installation
 
 ```bash
-# Add ArgoCD Helm repository
-helm repo add argo https://argoproj.github.io/argo-helm
-helm repo update
+# Check if ArgoCD is running
+kubectl get pods -n argocd
 
-# Install ArgoCD
-helm install argocd argo/argo-cd \
-  --namespace argocd \
-  --create-namespace \
-  --set server.service.type=LoadBalancer \
-  --set server.service.loadBalancerSourceRanges="{0.0.0.0/0}" \
-  --set configs.params.server\\.insecure=true \
-  --set server.extraArgs="{--insecure}"
-
-# Wait for ArgoCD to be ready
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-server -n argocd --timeout=300s
+# Check ArgoCD service
+kubectl get svc -n argocd
 ```
 
-### Step 4: Access ArgoCD
+---
 
+## 🏢 Multi-Environment Setup
+
+This repository provides three fully configured environments with progressive resource allocation:
+
+### Environment Specifications
+
+| Environment | Location | VM Size | Node Count | Auto-Scaling | OS Disk | Use Case |
+|-------------|----------|---------|------------|--------------|---------|----------|
+| **Dev** | East US | Standard_D2s_v3 | 2 | 1-5 nodes | 30GB | Development & Testing |
+| **Test** | East US 2 | Standard_D4s_v3 | 3 | 2-8 nodes | 50GB | Integration Testing |
+| **Prod** | West US 2 | Standard_D8s_v3 | 5 | 3-10 nodes | 100GB | Production Workloads |
+
+### Deployment Instructions
+
+#### Deploy Development Environment
 ```bash
-# Get LoadBalancer IP
-kubectl get svc argocd-server -n argocd
-
-# Get admin password
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
-
-# Access ArgoCD UI
-# URL: http://<EXTERNAL-IP>
-# Username: admin
-# Password: <password from above>
+cd dev/
+terraform init
+terraform plan
+terraform apply -auto-approve
 ```
 
-### Step 5: Deploy Application via GitOps
+#### Deploy Test Environment  
+```bash
+cd test/
+terraform init
+terraform plan
+terraform apply -auto-approve
+```
+
+#### Deploy Production Environment
+```bash
+cd prod/
+terraform init
+terraform plan
+terraform apply -auto-approve
+```
+
+### Environment-Specific Features
+
+#### **Development Environment**
+- **Purpose**: Local development and experimentation
+- **Resources**: Minimal resource allocation for cost efficiency
+- **Monitoring**: Basic logging enabled
+- **ArgoCD**: Single replica with standard resource limits
+
+#### **Test Environment**  
+- **Purpose**: Integration testing and staging
+- **Resources**: Enhanced VM sizes and node count for testing workloads
+- **Monitoring**: Standard monitoring with extended log retention
+- **ArgoCD**: Enhanced resource limits for better performance
+
+#### **Production Environment**
+- **Purpose**: Production workloads with high availability
+- **Resources**: High-performance VMs with maximum scalability
+- **Monitoring**: Full monitoring suite with 90-day log retention
+- **ArgoCD**: High availability with multiple replicas and production-grade resource allocation
+
+### Backend State Management
+
+Each environment has its own Terraform state file:
+- **Dev**: `dev/terraform.tfstate`
+- **Test**: `test/terraform.tfstate`  
+- **Prod**: `prod/terraform.tfstate`
+
+Configure remote state backend for each environment using the respective `backend.tf.example`:
 
 ```bash
-# Create ArgoCD Application
+# For each environment
+cp backend.tf.example backend.tf
+# Update with your Azure Storage Account details
+```
+
+---
+
+## 🌐 Accessing ArgoCD WebUI
+
+### Get ArgoCD Access Information
+
+```bash
+# Get the LoadBalancer external IP
+ARGOCD_IP=$(kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+echo "ArgoCD URL: http://$ARGOCD_IP"
+
+# Get the admin password
+ARGOCD_PASSWORD=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d)
+echo "Username: admin"
+echo "Password: $ARGOCD_PASSWORD"
+```
+
+### Access ArgoCD WebUI
+
+1. **Open your web browser** and navigate to: `http://<EXTERNAL-IP>`
+
+2. **Login credentials:**
+   - **Username:** `admin`
+   - **Password:** Use the password from the command above
+
+3. **First-time setup:**
+   - Change the default admin password
+   - Explore the ArgoCD interface
+   - Check the "Applications" section
+
+### Alternative: Port Forward (if LoadBalancer IP is not available)
+
+```bash
+# Port forward ArgoCD service to localhost
+kubectl port-forward svc/argocd-server -n argocd 8080:80
+
+# Access via: http://localhost:8080
+# Use same credentials as above
+```
+
+---
+
+## 🎯 Quick Application Access
+
+
+###  Manual Steps
+
+```bash
+# 1. Check your deployed applications
+kubectl get applications -n argocd
+
+# 2. For the guestbook application, start port forwarding
+kubectl port-forward svc/guestbook-ui -n guestbook-dev 8081:80
+
+# 3. Open your browser and navigate to:
+# http://localhost:8081
+```
+
+**🎉 Your application is now accessible! Try adding some messages to see the guestbook in action.**
+
+---
+
+## 📋 Application Access Summary
+
+### 🎯 Quick Access (Recommended)
+```bash
+# Use the helper script for easiest access
+./access-app.sh
+```
+
+### 🔗 All Access Methods
+
+| Method | Use Case | Command | Access URL |
+|--------|----------|---------|------------|
+| **Port Forward** | Development, Testing | `kubectl port-forward svc/guestbook-ui -n guestbook-dev 8081:80` | `http://localhost:8081` |
+| **LoadBalancer** | External Access | `kubectl patch svc guestbook-ui -n guestbook-dev -p '{"spec":{"type":"LoadBalancer"}}'` | `http://<EXTERNAL-IP>` |
+| **Ingress** | Production, Custom Domain | Create Ingress resource | `http://guestbook.local` |
+
+
+### 🚀 Next Steps
+1. **Try the Application**: Add some messages to test functionality
+2. **Monitor via ArgoCD**: Check sync status and health
+3. **Deploy More Apps**: Use the GitOps pattern for your applications  
+4. **Scale to Production**: Deploy test and prod environments
+
+---
+
+## 🚀 Deploying Applications
+
+### Option 1: Using Terraform (Automated)
+
+The guestbook appis automatically deployed via the Terraform configuration:
+
+```bash
+# Check if application is deployed
+kubectl get applications -n argocd
+
+# Check application status
+kubectl describe application guestbook-dev -n argocd
+```
+
+### Option 2: Manual Application Deployment
+
+```bash
+# Create a sample application via ArgoCD CLI or WebUI
 kubectl apply -f - <<EOF
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: goal-tracker-dev
+  name: my-app
   namespace: argocd
 spec:
   project: default
   source:
-    repoURL: https://github.com/yourusername/gitops-configs.git
+    repoURL: https://github.com/your-username/your-app-repo
     targetRevision: HEAD
-    path: environments/dev
+    path: manifests
   destination:
     server: https://kubernetes.default.svc
-    namespace: goal-tracker
+    namespace: default
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
 EOF
-
-# Check application status
-kubectl get applications -n argocd
 ```
 
-### Step 6: Deploy Additional Environments
+---
 
-For Test and Production environments:
+## 🌍 Accessing Deployed Application WebUI
+
+### Check Deployed Applications
 
 ```bash
-# Test Environment
-cd ../test/
-mv backend.tf backend.tf.backup
-terraform init
-terraform plan -out=tfplan
-terraform apply tfplan
+# List all deployed applications
+kubectl get applications -n argocd
 
-# Production Environment  
-cd ../prod/
-mv backend.tf backend.tf.backup
-terraform init
-terraform plan -out=tfplan
-terraform apply tfplan
+# Check application details and sync status
+kubectl describe application guestbook-dev -n argocd
+
+# Verify application pods and services are running
+kubectl get pods,svc -n guestbook-dev
+
+# Expected output:
+# NAME                                READY   STATUS    RESTARTS   AGE
+# pod/guestbook-ui-85db984648-xxxxx   1/1     Running   0          20m
+# 
+# NAME                   TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE
+# service/guestbook-ui   ClusterIP   10.0.225.136   <none>        80/TCP    20m
+```
+
+### Access Application WebUI
+
+The deployed guestbook application runs as a ClusterIP service by default. Here are three methods to access it:
+
+#### Method 1: Port Forward (Recommended for Development)
+
+```bash
+# Start port forwarding for the guestbook application
+kubectl port-forward svc/guestbook-ui -n guestbook-dev 8081:80
+
+# Keep this terminal open and open your browser to:
+# http://localhost:8081
+
+# You should see the guestbook interface where you can:
+# - Add new messages
+# - View existing messages
+# - See real-time updates
+```
+
+
+#### Method 2: Expose Application via LoadBalancer
+
+For external access without port forwarding:
+
+```bash
+# Patch the service to use LoadBalancer type
+kubectl patch svc guestbook-ui -n guestbook-dev -p '{"spec":{"type":"LoadBalancer"}}'
+
+# Wait for external IP assignment (may take 2-5 minutes)
+echo "Waiting for external IP..."
+kubectl get svc guestbook-ui -n guestbook-dev --watch
+
+# Once you see an external IP, access the application:
+EXTERNAL_IP=$(kubectl get svc guestbook-ui -n guestbook-dev -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+echo "Access your application at: http://$EXTERNAL_IP"
+
+# To revert back to ClusterIP:
+# kubectl patch svc guestbook-ui -n guestbook-dev -p '{"spec":{"type":"ClusterIP"}}'
+```
+
+#### Method 3: Expose Application via Ingress (Production Ready)
+
+For production deployments with custom domains:
+
+```bash
+# First, install NGINX Ingress Controller (if not already installed)
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
+
+# Wait for ingress controller to be ready
+kubectl wait --namespace ingress-nginx \
+  --for=condition=ready pod \
+  --selector=app.kubernetes.io/component=controller \
+  --timeout=90s
+
+# Create an ingress for the application
+kubectl apply -f - <<EOF
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: guestbook-ingress
+  namespace: guestbook-dev
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: guestbook.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: guestbook-ui
+            port:
+              number: 80
+EOF
+
+# Get the ingress external IP
+INGRESS_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+echo "Ingress IP: $INGRESS_IP"
+
+# Add to /etc/hosts for local testing
+echo "$INGRESS_IP guestbook.local" | sudo tee -a /etc/hosts
+
+# Access via: http://guestbook.local
+echo "Access your application at: http://guestbook.local"
+```
+
+### Application Features & Testing
+
+The deployed guestbook application provides:
+
+- **📝 Frontend Interface**: Clean, responsive web UI for message management
+- **💾 Message Storage**: In-memory storage for demo purposes (messages reset on pod restart)
+- **⚡ Real-time Updates**: Messages appear instantly after submission
+- **🎨 Simple Design**: Minimalist interface perfect for testing GitOps workflows
+
+### Test Your Application
+
+```bash
+# Method 1: Browser Testing
+# 1. Open http://localhost:8081 (if using port forwarding)
+# 2. Add a test message: "Hello from AKS GitOps!"
+# 3. Verify the message appears in the list
+# 4. Add multiple messages to test functionality
+
+# Method 2: API Testing (if application supports REST API)
+curl -X POST http://localhost:8081/api/messages \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hello from curl!"}'
+
+# Method 3: Load Testing (optional)
+# Install Apache Bench: sudo apt-get install apache2-utils
+ab -n 100 -c 10 http://localhost:8081/
+```
+
+### Verify Application Health
+
+```bash
+# Check pod status and readiness
+kubectl get pods -n guestbook-dev
+kubectl describe pod -l app=guestbook-ui -n guestbook-dev
+
+# Check application logs for any issues
+kubectl logs -l app=guestbook-ui -n guestbook-dev --tail=50
+
+# Verify service endpoints are working
+kubectl get endpoints guestbook-ui -n guestbook-dev
+
+# Test application connectivity from within cluster
+kubectl run debug-pod --image=curlimages/curl --rm -it --restart=Never -- \
+  curl -s http://guestbook-ui.guestbook-dev.svc.cluster.local
+
+# Health check with port forwarding
+kubectl port-forward svc/guestbook-ui -n guestbook-dev 8081:80 &
+sleep 3
+curl -s http://localhost:8081 | grep -i "guestbook\|welcome\|message" || echo "Application responded"
+kill %1  # Stop background port forwarding
+```
+
+### Troubleshooting Application Access
+
+#### Common Issues and Solutions
+
+**1. Port Forward Connection Refused**
+```bash
+# Check if service exists and has endpoints
+kubectl get svc,endpoints -n guestbook-dev
+
+# Verify pod is running and ready
+kubectl get pods -n guestbook-dev
+kubectl logs -l app=guestbook-ui -n guestbook-dev
+
+# Try different local port
+kubectl port-forward svc/guestbook-ui -n guestbook-dev 8082:80
+```
+
+**2. Application Not Loading in Browser**
+```bash
+# Check if port forwarding is active
+netstat -tulpn | grep :8081
+lsof -i :8081
+
+# Test with curl first
+curl -v http://localhost:8081
+
+# Check for firewall issues
+sudo ufw status
+```
+
+**3. LoadBalancer External IP Pending**
+```bash
+# Check if LoadBalancer service is supported
+kubectl describe svc guestbook-ui -n guestbook-dev
+
+# Check Azure Load Balancer configuration
+az network lb list --resource-group MC_*
+
+# Fall back to port forwarding
+kubectl patch svc guestbook-ui -n guestbook-dev -p '{"spec":{"type":"ClusterIP"}}'
+```
+
+**4. Application Shows Error or Empty Page**
+```bash
+# Check application logs for errors
+kubectl logs -l app=guestbook-ui -n guestbook-dev --tail=100
+
+# Restart the application pod
+kubectl rollout restart deployment/guestbook-ui -n guestbook-dev
+
+# Check if ArgoCD sync is healthy
+kubectl describe application guestbook-dev -n argocd
 ```
 
 ---
 
 ## ✅ Verification
 
-### Automated Validation
+### Automated Validation Script
+
 ```bash
-cd dev/
+# Run the deployment validation script
 chmod +x validate-deployment.sh
 ./validate-deployment.sh
 ```
 
-### Manual Verification
-```bash
-# 1. Check Terraform state
-terraform state list
-terraform output
+### Manual Verification Steps
 
-# 2. Verify AKS cluster
+```bash
+# 1. Check cluster status
 kubectl get nodes
 kubectl cluster-info
 
-# 3. Check ArgoCD
+# 2. Verify ArgoCD components
 kubectl get pods -n argocd
-kubectl get svc argocd-server -n argocd
+kubectl get svc -n argocd
 
-# 4. Verify applications
+# 3. Check applications
 kubectl get applications -n argocd
-kubectl get pods -n goal-tracker  # If application deployed
+
+# 4. Test application access (if Goal Tracker is deployed)
+kubectl get pods -n goal-tracker
+kubectl get svc -n goal-tracker
 ```
 
-### Health Indicators
-✅ **Healthy Deployment:**
-- All Terraform resources in state
-- AKS cluster status = "Succeeded"
-- All nodes show "Ready"
+### Health Indicators ✅
+
+**Healthy deployment should show:**
+
+- All nodes in "Ready" state
 - All ArgoCD pods "Running"
-- LoadBalancer has external IP
-- ArgoCD UI accessible
-- Applications "Synced" and "Healthy"
+- ArgoCD LoadBalancer has external IP
+- Applications show "Synced" and "Healthy" status
 
 ---
 
@@ -299,52 +738,48 @@ kubectl get pods -n goal-tracker  # If application deployed
 
 ### Common Issues and Solutions
 
-#### 1. State Tracking Error
+#### 1. kubectl Connection Issues
+
 ```bash
-# Error: "Provider produced inconsistent result after apply"
-# Solution: Use local state initially
-mv backend.tf backend.tf.backup
-terraform init -reconfigure
+# Reset kubectl configuration
+az aks get-credentials --resource-group <rg-name> --name <cluster-name> --admin --overwrite-existing
+
+# Test connectivity
+kubectl get nodes --request-timeout=30s
 ```
 
-#### 2. kubectl Connection Issues
-```bash
-# Install kubelogin if missing
-curl -LO "https://github.com/Azure/kubelogin/releases/latest/download/kubelogin-linux-amd64.zip"
-unzip kubelogin-linux-amd64.zip
-sudo cp bin/linux_amd64/kubelogin /usr/local/bin/
+#### 2. ArgoCD UI Not Accessible
 
-# Get admin credentials
-az aks get-credentials --resource-group <rg-name> --name <cluster-name> --admin
-```
-
-#### 3. ArgoCD UI Not Accessible
 ```bash
+# Check LoadBalancer service
+kubectl get svc argocd-server -n argocd
+
 # Use port forwarding as backup
 kubectl port-forward svc/argocd-server -n argocd 8080:80
 # Access: http://localhost:8080
 ```
 
-#### 4. Application Sync Issues
-```bash
-# Check ArgoCD logs
-kubectl logs -n argocd deployment/argocd-application-controller
+#### 3. Terraform Apply Fails
 
-# Force sync
-kubectl patch application goal-tracker-dev -n argocd --type merge --patch '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":true}}}}'
+```bash
+# Check Azure authentication
+az account show
+
+# Re-initialize Terraform
+terraform init -reconfigure
+
+# Check for resource conflicts
+terraform plan
 ```
 
-### Debug Commands
+#### 4. Application Sync Issues
+
 ```bash
-# Check all pods across namespaces
-kubectl get pods --all-namespaces
+# Check ArgoCD application status
+kubectl describe application <app-name> -n argocd
 
-# Check events
-kubectl get events --sort-by=.metadata.creationTimestamp
-
-# Check resource usage
-kubectl top nodes
-kubectl top pods --all-namespaces
+# Force sync via CLI
+kubectl patch application <app-name> -n argocd --type merge --patch '{"operation":{"sync":{"syncStrategy":{"force":true}}}}'
 ```
 
 ---
@@ -352,389 +787,67 @@ kubectl top pods --all-namespaces
 ## 🧹 Clean Up
 
 ### Remove Applications
-```bash
-# Delete ArgoCD applications
-kubectl delete applications --all -n argocd
 
-# Delete ArgoCD
-helm uninstall argocd -n argocd
-kubectl delete namespace argocd
-```
-
-### Remove Infrastructure
-```bash
-# Destroy each environment
-cd dev/
-terraform destroy -auto-approve
-
-cd ../test/
-terraform destroy -auto-approve
-
-cd ../prod/
-terraform destroy -auto-approve
-```
-
----
-
-## 📚 Additional Resources
-
-### Quick Reference Commands
-```bash
-# Get cluster info
-kubectl cluster-info
-
-# ArgoCD password
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
-
-# Port forward ArgoCD
-kubectl port-forward svc/argocd-server -n argocd 8080:80
-
-# Check application status
-kubectl get applications -n argocd
-```
-
-### Useful Links
-- [ArgoCD Documentation](https://argo-cd.readthedocs.io/)
-- [AKS Documentation](https://docs.microsoft.com/en-us/azure/aks/)
-- [Terraform AzureRM Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs)
-
----
-
-## 🎯 Success Criteria
-
-Your deployment is successful when:
-- ✅ AKS cluster is running and accessible
-- ✅ ArgoCD UI is accessible via LoadBalancer
-- ✅ Applications can be deployed via GitOps
-- ✅ All validation checks pass
-- ✅ No Terraform state tracking issues
-
-**🎉 Congratulations! You now have a production-ready AKS GitOps setup!**
-
----
-
-## 📊 Environment Configuration Details
-
-### Environment Differences
-
-| Environment | Location | Node Count | VM Size | Auto-Scaling | Replicas (Frontend/Backend) |
-|-------------|----------|------------|---------|--------------|----------------------------|
-| Dev         | eastus   | 2          | Standard_D2s_v3 | 1-5 nodes | 1/1 |
-| Test        | eastus2  | 2          | Standard_D2s_v3 | 1-5 nodes | 2/2 |
-| Prod        | westus2  | 3          | Standard_D4s_v3 | 2-10 nodes | 3/3 |
-
-### Key Features Enabled
-- ✅ **Auto-scaling**: Cluster auto-scaler enabled (min: 1, max: 5 for dev/test, 2-10 for prod)
-- ✅ **Azure CNI**: Advanced networking with network policies
-- ✅ **Azure AD RBAC**: Role-based access control integration
-- ✅ **Container Insights**: Monitoring and logging enabled
-- ✅ **Managed Identity**: System-assigned identity for secure access
-- ✅ **OMS Agent**: Log Analytics integration for cluster monitoring
-
-## 🏗️ Infrastructure Components
-
-### Terraform Resources Deployed
-1. **Resource Group**: `aks-gitops-rg-{environment}`
-2. **AKS Cluster**: `aks-gitops-cluster-{environment}`
-3. **Log Analytics Workspace**: For monitoring and logging
-4. **Managed Identity**: System-assigned for secure Azure resource access
-5. **Node Pool**: Auto-scaling enabled with appropriate VM sizes
-
-### ArgoCD Configuration
-- **Namespace**: `argocd`
-- **Service Type**: LoadBalancer with external access
-- **Security**: Insecure mode for demo (configure TLS for production)
-- **High Availability**: Multiple replicas for production resilience
-
-## 🔗 GitOps Repository Setup
-
-### 1. Create GitOps Repository
-```bash
-# Create new repository on GitHub named 'gitops-configs'
-# Or use existing repository and update the URL
-```
-
-### 2. Repository Structure
-```
-gitops-configs/
-├── environments/
-│   ├── dev/
-│   │   ├── goal-tracker/
-│   │   │   ├── namespace.yaml
-│   │   │   ├── frontend-deployment.yaml
-│   │   │   ├── backend-deployment.yaml
-│   │   │   ├── postgres-deployment.yaml
-│   │   │   └── services.yaml
-│   │   └── kustomization.yaml
-│   ├── test/
-│   └── prod/
-└── base/
-    └── goal-tracker/
-        ├── deployments/
-        ├── services/
-        └── configs/
-```
-
-### 3. Update Repository URL
-Edit `terraform.tfvars` in each environment:
-```bash
-gitops_repo_url = "https://github.com/yourusername/gitops-configs.git"
-```
-
-## 📱 Application Components
-
-### Goal Tracker Application
-- **Frontend**: React application (`itsbaivab/frontend:latest`)
-  - Service Type: LoadBalancer for external access
-  - Replicas: Environment-specific scaling
-  - Health checks: Readiness and liveness probes
-
-- **Backend**: REST API (`itsbaivab/backend:latest`)
-  - Service Type: ClusterIP (internal access only)
-  - Database connection: PostgreSQL integration
-  - Environment variables: Database credentials via ConfigMap/Secrets
-
-- **Database**: PostgreSQL 15
-  - Persistent Volume: Azure Disk for data persistence
-  - Backup: Automated snapshots (configure separately)
-  - High Availability: Consider Azure Database for PostgreSQL for production
-
-## 📈 Monitoring and Observability
-
-### Built-in Monitoring
-```bash
-# Check cluster health
-kubectl get nodes
-kubectl top nodes
-
-# Monitor ArgoCD applications
-kubectl get applications -n argocd
-
-# Check application health
-kubectl get pods -n goal-tracker
-kubectl describe deployment frontend -n goal-tracker
-```
-
-### Azure Monitor Integration
-- **Container Insights**: Real-time monitoring of containers and nodes
-- **Log Analytics**: Centralized logging for troubleshooting
-- **Metrics**: CPU, memory, and custom application metrics
-- **Alerts**: Configure alerts for critical thresholds
-
-### ArgoCD Monitoring
-```bash
-# ArgoCD CLI installation (optional)
-curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
-sudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd
-
-# Login to ArgoCD CLI
-argocd login <ARGOCD_SERVER_IP>
-
-# Monitor applications
-argocd app list
-argocd app get goal-tracker-dev
-argocd app sync goal-tracker-dev
-```
-
-## 🔐 Production Security Recommendations
-
-### 1. TLS Configuration for ArgoCD
-```bash
-# Generate TLS certificates
-kubectl create secret tls argocd-server-tls \
-  --cert=server.crt \
-  --key=server.key \
-  -n argocd
-
-# Update ArgoCD server to use TLS
-helm upgrade argocd argo/argo-cd \
-  --namespace argocd \
-  --set server.certificate.enabled=true \
-  --reuse-values
-```
-
-### 2. Azure Key Vault Integration
-```bash
-# Install Azure Key Vault CSI driver
-helm repo add secrets-store-csi-driver https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts
-helm install csi-secrets-store secrets-store-csi-driver/secrets-store-csi-driver \
-  --namespace kube-system
-```
-
-### 3. Network Policies
-```yaml
-# Example network policy for goal-tracker namespace
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: goal-tracker-network-policy
-  namespace: goal-tracker
-spec:
-  podSelector: {}
-  policyTypes:
-  - Ingress
-  - Egress
-  ingress:
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          name: argocd
-  egress:
-  - to: []
-```
-
-## 🚨 Advanced Troubleshooting
-
-### State Management Issues
-```bash
-# If you encounter state locking issues:
-terraform force-unlock <LOCK_ID>
-
-# Reset local state (use carefully):
-rm -rf .terraform/
-terraform init
-
-# Import existing resources:
-terraform import azurerm_resource_group.main /subscriptions/{subscription-id}/resourceGroups/{rg-name}
-```
-
-### AKS Connection Issues
-```bash
-# Reset kubectl configuration
-az aks get-credentials --resource-group <rg-name> --name <cluster-name> --admin --overwrite-existing
-
-# Troubleshoot kubelogin
-kubelogin convert-kubeconfig -l azurecli
-kubelogin remove-tokens
-
-# Check Azure RBAC
-az role assignment list --assignee $(az account show --query user.name -o tsv) --scope /subscriptions/$(az account show --query id -o tsv)
-```
-
-### ArgoCD Troubleshooting
-```bash
-# Check ArgoCD controller logs
-kubectl logs -n argocd deployment/argocd-application-controller
-
-# Check ArgoCD server logs
-kubectl logs -n argocd deployment/argocd-server
-
-# Reset ArgoCD admin password
-kubectl -n argocd patch secret argocd-secret \
-  -p '{"stringData": {
-    "admin.password": "$2a$10$rRyBsGSHK6.uc8fntPwVIuLVHgsAhAX7TcdrqW/RADU0uh7CaChLa",
-    "admin.passwordMtime": "'$(date +%FT%T%Z)'"
-  }}'
-```
-
-## 🧹 Complete Cleanup Guide
-
-### 1. Remove Applications and ArgoCD
 ```bash
 # Delete all ArgoCD applications
 kubectl delete applications --all -n argocd
-
-# Wait for applications to be removed
-kubectl get applications -n argocd
-
-# Remove ArgoCD
-helm uninstall argocd -n argocd
-kubectl delete namespace argocd
-
-# Remove application namespaces
-kubectl delete namespace goal-tracker
 ```
 
-### 2. Destroy Infrastructure
+### Remove Infrastructure
+
 ```bash
-# Destroy each environment (start with dev)
-cd dev/
-terraform destroy -auto-approve
-
-cd ../test/
-terraform destroy -auto-approve
-
-cd ../prod/
+# Destroy the environment
 terraform destroy -auto-approve
 ```
 
-### 3. Clean Local State (if needed)
+### Clean Up Resources
+
 ```bash
-# Remove local state files
-rm -rf dev/.terraform*
-rm -rf test/.terraform*
-rm -rf prod/.terraform*
+# Remove kubectl configuration
+kubectl config delete-context <cluster-context>
 
-# Remove state backups
-rm -rf */terraform.tfstate*
+# Clean up local files
+rm -f ~/.kube/config.backup
 ```
-
-## 📚 Additional Resources and Best Practices
-
-### Useful Commands Reference
-```bash
-# Quick cluster info
-kubectl cluster-info dump --output-directory=/tmp/cluster-info
-
-# Get all resources in a namespace
-kubectl get all -n argocd
-
-# Watch pod status in real-time
-kubectl get pods -n goal-tracker -w
-
-# Port forward for local access
-kubectl port-forward svc/frontend -n goal-tracker 8080:80
-
-# Scale deployments
-kubectl scale deployment frontend --replicas=3 -n goal-tracker
-
-# Check resource usage
-kubectl top pods -n goal-tracker --sort-by=cpu
-```
-
-### Production Checklist
-- [ ] TLS certificates configured for ArgoCD
-- [ ] Azure Key Vault integration for secrets
-- [ ] Network policies implemented
-- [ ] Resource quotas and limits set
-- [ ] Monitoring and alerting configured
-- [ ] Backup strategy implemented
-- [ ] RBAC properly configured
-- [ ] Security scanning enabled
-- [ ] Pod Security Standards enforced
-- [ ] Horizontal Pod Autoscaler configured
-
-### Learning Resources
-- [Kubernetes Documentation](https://kubernetes.io/docs/)
-- [ArgoCD Getting Started](https://argo-cd.readthedocs.io/en/stable/getting_started/)
-- [Azure AKS Best Practices](https://docs.microsoft.com/en-us/azure/aks/best-practices)
-- [GitOps Principles](https://www.gitops.tech/)
-- [Terraform Azure Provider](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs)
-
-### Support and Community
-- **GitHub Issues**: Report bugs and request features
-- **Community Slack**: Join Kubernetes and ArgoCD communities
-- **Azure Support**: Use Azure support for AKS-specific issues
-- **Stack Overflow**: Tag questions with `azure-aks`, `argocd`, `terraform`
 
 ---
 
-## 🎯 Success Metrics
+## 📝 Configuration Files
 
-Your GitOps deployment is successful when:
-- ✅ All Terraform resources deployed without state tracking errors
-- ✅ AKS cluster status shows "Succeeded" in Azure portal
-- ✅ All nodes are in "Ready" state
-- ✅ ArgoCD UI is accessible via LoadBalancer external IP
-- ✅ All ArgoCD pods are running and healthy
-- ✅ Applications sync successfully from Git repository
-- ✅ Application pods are running and healthy
-- ✅ Services have external IPs (where configured)
-- ✅ Validation script passes all checks
-- ✅ No critical errors in cluster or application logs
+### Key Configuration Files
 
-**🚀 You now have a production-ready, scalable AKS GitOps platform!**
+- `terraform.tfvars` - Environment-specific variables
+- `main.tf` - AKS cluster configuration
+- `kubernetes-resources.tf` - ArgoCD and Kubernetes resources
+- `provider.tf` - Terraform provider configuration
+
+### Default Settings
+
+- **Environment:** Development
+- **Location:** East US
+- **Node Count:** 2 (auto-scaling: 1-5)
+- **VM Size:** Standard_D2s_v3
+- **ArgoCD:** LoadBalancer with insecure mode (demo)
 
 ---
 
-*For additional support or questions, refer to the troubleshooting section or create an issue in this repository.*
+## 🎯 Next Steps
+
+1. **Explore ArgoCD WebUI** - Navigate through applications and sync policies
+2. **Deploy Your Applications** - Add your own Git repositories
+3. **Set Up Monitoring** - Configure Log Analytics and Azure Monitor
+4. **Enable TLS** - Configure HTTPS for ArgoCD in production
+5. **Scale to Test/Prod** - Deploy test and production environments
+
+---
+
+## 📞 Support
+
+For issues or questions:
+
+1. Check the troubleshooting section above
+2. Review Terraform and kubectl logs
+3. Validate Azure permissions and quotas
+4. Ensure all prerequisites are met
+
+**🎉 Congratulations! You now have a fully functional AKS GitOps platform!**

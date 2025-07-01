@@ -1,13 +1,12 @@
 variable "environment" {
   description = "Environment name, such as 'prod', 'staging', 'dev'"
   type        = string
-  default     = "prod"
+  default     = "dev"
 }
-
 variable "location" {
   description = "Azure region for resources"
   type        = string
-  default     = "westus2"
+  default     = "eastus"
 }
 
 variable "resource_group_name" {
@@ -22,16 +21,12 @@ variable "kubernetes_cluster_name" {
   default     = "aks-gitops-cluster"
 }
 
-variable "node_count" {
-  description = "Number of nodes in the default node pool"
-  type        = number
-  default     = 3
-}
+
 
 variable "vm_size" {
   description = "Size of the Virtual Machine"
   type        = string
-  default     = "Standard_D4s_v3"
+  default     = "Standard_D2s_v3"
 }
 
 variable "kubernetes_version" {
@@ -57,7 +52,7 @@ variable "tags" {
   description = "Tags to apply to all resources"
   type        = map(string)
   default = {
-    Environment = "production"
+    Environment = "development"
     Project     = "AKS-GitOps"
     ManagedBy   = "Terraform"
   }

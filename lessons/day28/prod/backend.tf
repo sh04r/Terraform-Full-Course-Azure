@@ -4,7 +4,7 @@ terraform {
     storage_account_name = "tfstatebaivabremote"
     container_name       = "tfstate"
     key                  = "prod.gitops.tfstate"
-    use_azuread_auth     = true
+    use_azuread_auth     = false
     use_msi              = true
   }
 }

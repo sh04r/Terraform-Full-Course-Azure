@@ -40,20 +40,21 @@ provider "azurerm" {
   use_msi = true
 }
 
-# Dynamic Kubernetes provider configuration
+# Dynamic Kubernetes provider configuration using admin credentials
+# This bypasses Azure AD authentication issues for automation scenarios
 provider "kubernetes" {
-  host                   = try(azurerm_kubernetes_cluster.main.kube_config.0.host, "")
-  client_certificate     = try(base64decode(azurerm_kubernetes_cluster.main.kube_config.0.client_certificate), "")
-  client_key             = try(base64decode(azurerm_kubernetes_cluster.main.kube_config.0.client_key), "")
-  cluster_ca_certificate = try(base64decode(azurerm_kubernetes_cluster.main.kube_config.0.cluster_ca_certificate), "")
+  host                   = try(azurerm_kubernetes_cluster.main.kube_admin_config.0.host, "")
+  client_certificate     = try(base64decode(azurerm_kubernetes_cluster.main.kube_admin_config.0.client_certificate), "")
+  client_key             = try(base64decode(azurerm_kubernetes_cluster.main.kube_admin_config.0.client_key), "")
+  cluster_ca_certificate = try(base64decode(azurerm_kubernetes_cluster.main.kube_admin_config.0.cluster_ca_certificate), "")
 }
 
-# Dynamic Helm provider configuration
+# Dynamic Helm provider configuration using admin credentials  
 provider "helm" {
   kubernetes {
-    host                   = try(azurerm_kubernetes_cluster.main.kube_config.0.host, "")
-    client_certificate     = try(base64decode(azurerm_kubernetes_cluster.main.kube_config.0.client_certificate), "")
-    client_key             = try(base64decode(azurerm_kubernetes_cluster.main.kube_config.0.client_key), "")
-    cluster_ca_certificate = try(base64decode(azurerm_kubernetes_cluster.main.kube_config.0.cluster_ca_certificate), "")
+    host                   = try(azurerm_kubernetes_cluster.main.kube_admin_config.0.host, "")
+    client_certificate     = try(base64decode(azurerm_kubernetes_cluster.main.kube_admin_config.0.client_certificate), "")
+    client_key             = try(base64decode(azurerm_kubernetes_cluster.main.kube_admin_config.0.client_key), "")
+    cluster_ca_certificate = try(base64decode(azurerm_kubernetes_cluster.main.kube_admin_config.0.cluster_ca_certificate), "")
   }
 }

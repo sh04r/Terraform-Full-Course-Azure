@@ -14,7 +14,7 @@ resource "kubernetes_namespace" "argocd" {
   depends_on = [time_sleep.wait_for_cluster]
 }
 
-# Install ArgoCD using Helm with better error handling
+# Install ArgoCD using Helm with production-grade configuration
 resource "helm_release" "argocd" {
   name       = "argocd"
   repository = "https://argoproj.github.io/argo-helm"
@@ -39,6 +39,7 @@ resource "helm_release" "argocd" {
     value = "{0.0.0.0/0}"
   }
 
+  # For production, consider using HTTPS instead of insecure mode
   set {
     name  = "configs.params.server\\.insecure"
     value = "true"
@@ -49,15 +50,41 @@ resource "helm_release" "argocd" {
     value = "{--insecure}"
   }
 
-  # Resource limits for stability
+  # Production-grade resource limits
   set {
     name  = "server.resources.limits.cpu"
-    value = "500m"
+    value = "2000m" # Higher CPU for production
   }
 
   set {
     name  = "server.resources.limits.memory"
-    value = "512Mi"
+    value = "2Gi" # Higher memory for production
+  }
+
+  set {
+    name  = "server.resources.requests.cpu"
+    value = "1000m"
+  }
+
+  set {
+    name  = "server.resources.requests.memory"
+    value = "1Gi"
+  }
+
+  # High availability for production
+  set {
+    name  = "server.replicas"
+    value = "2"
+  }
+
+  set {
+    name  = "repoServer.replicas"
+    value = "2"
+  }
+
+  set {
+    name  = "applicationSet.replicas"
+    value = "2"
   }
 
   depends_on = [kubernetes_namespace.argocd]
