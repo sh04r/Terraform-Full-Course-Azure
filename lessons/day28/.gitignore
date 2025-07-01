@@ -4,7 +4,9 @@
 *.tfplan
 .terraform/
 .terraform.lock.hcl
-*/backend.tf
+dev/backend.tf
+test/backend.tf
+prod/backend.tf
 # Backup files
 *.backup
 
