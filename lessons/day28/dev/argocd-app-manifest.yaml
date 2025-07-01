@@ -6,9 +6,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/argoproj/argocd-example-apps.git
+    repoURL: ${APP_REPO_URL}
     targetRevision: HEAD
-    path: guestbook
+    path: ${APP_REPO_PATH}
   destination:
     server: https://kubernetes.default.svc
     namespace: guestbook-${ENVIRONMENT}

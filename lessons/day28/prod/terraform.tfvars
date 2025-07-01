@@ -6,6 +6,8 @@ vm_size                 = "Standard_D8s_v3" # Upgraded VM size for production (8
 kubernetes_version      = "1.32.5"
 gitops_repo_url         = "https://github.com/itsbaivab/gitops-configs.git"
 argocd_namespace        = "argocd"
+app_repo_url            = "https://github.com/argoproj/argocd-example-apps.git"
+app_repo_path           = "guestbook"
 
 tags = {
   Environment = "production"

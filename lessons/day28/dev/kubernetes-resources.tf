@@ -83,6 +83,8 @@ resource "null_resource" "goal_tracker_app" {
       ENVIRONMENT      = var.environment
       ARGOCD_NAMESPACE = var.argocd_namespace
       GITOPS_REPO_URL  = var.gitops_repo_url
+      APP_REPO_URL     = var.app_repo_url
+      APP_REPO_PATH    = var.app_repo_path
     }
   }
 

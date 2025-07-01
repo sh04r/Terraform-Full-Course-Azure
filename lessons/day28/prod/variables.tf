@@ -47,12 +47,24 @@ variable "argocd_namespace" {
   default     = "argocd"
 }
 
+variable "app_repo_url" {
+  description = "Repository URL for the application to be deployed via ArgoCD"
+  type        = string
+  default     = "https://github.com/argoproj/argocd-example-apps.git"
+}
+
+variable "app_repo_path" {
+  description = "Path within the repository for the application manifests"
+  type        = string
+  default     = "guestbook"
+}
+
 # Tags
 variable "tags" {
   description = "Tags to apply to all resources"
   type        = map(string)
   default = {
-    Environment = "development"
+    Environment = "production"
     Project     = "AKS-GitOps"
     ManagedBy   = "Terraform"
   }
