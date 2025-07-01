@@ -1,0 +1,64 @@
+variable "environment" {
+  description = "Environment name, such as 'prod', 'staging', 'dev'"
+  type        = string
+  default     = "prod"
+}
+
+variable "location" {
+  description = "Azure region for resources"
+  type        = string
+  default     = "westus2"
+}
+
+variable "resource_group_name" {
+  description = "Name of the resource group"
+  type        = string
+  default     = "aks-gitops-rg"
+}
+
+variable "kubernetes_cluster_name" {
+  description = "Name of the AKS cluster"
+  type        = string
+  default     = "aks-gitops-cluster"
+}
+
+variable "node_count" {
+  description = "Number of nodes in the default node pool"
+  type        = number
+  default     = 3
+}
+
+variable "vm_size" {
+  description = "Size of the Virtual Machine"
+  type        = string
+  default     = "Standard_D4s_v3"
+}
+
+variable "kubernetes_version" {
+  description = "Kubernetes version"
+  type        = string
+  default     = "1.32.5"
+}
+
+variable "gitops_repo_url" {
+  description = "GitOps repository URL for ArgoCD"
+  type        = string
+  default     = "https://github.com/itsbaivab/gitops-configs.git"
+}
+
+variable "argocd_namespace" {
+  description = "Namespace for ArgoCD"
+  type        = string
+  default     = "argocd"
+}
+
+# Tags
+variable "tags" {
+  description = "Tags to apply to all resources"
+  type        = map(string)
+  default = {
+    Environment = "production"
+    Project     = "AKS-GitOps"
+    ManagedBy   = "Terraform"
+  }
+}
