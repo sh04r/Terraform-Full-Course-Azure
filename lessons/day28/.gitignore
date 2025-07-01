@@ -4,9 +4,11 @@
 *.tfplan
 .terraform/
 .terraform.lock.hcl
-dev/backend.tf
-test/backend.tf
-prod/backend.tf
+
+# Backend configuration files (contains sensitive storage account info)
+backend.tf
+*/backend.tf
+
 # Backup files
 *.backup
 
