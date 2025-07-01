@@ -143,6 +143,79 @@ This Terraform project deploys a secure and scalable 3-tier application infrastr
 - Azure subscription and permissions to create resources
 - Docker installed locally for building and pushing container images
 
+## Service Principal Setup for Terraform
+
+Before deploying infrastructure with Terraform, you need to create a service principal with contributor permissions. This allows Terraform to authenticate with Azure and create resources on your behalf.
+
+### Create Service Principal
+
+1. **Login to Azure CLI:**
+   ```bash
+   az login
+   ```
+
+2. **Get your subscription ID:**
+   ```bash
+   az account show --query id --output tsv
+   ```
+
+3. **Create a service principal with Contributor role:**
+   ```bash
+   az ad sp create-for-rbac --name "terraform-sp" \
+     --role="Contributor" \
+     --scopes="/subscriptions/<YOUR_SUBSCRIPTION_ID>"
+   ```
+
+   This command will output JSON similar to:
+   ```json
+   {
+     "appId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+     "displayName": "terraform-sp",
+     "password": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+     "tenant": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+   }
+   ```
+
+4. **Set environment variables for Terraform authentication:**
+   ```bash
+   export ARM_CLIENT_ID="<appId>"
+   export ARM_CLIENT_SECRET="<password>"
+   export ARM_SUBSCRIPTION_ID="<YOUR_SUBSCRIPTION_ID>"
+   export ARM_TENANT_ID="<tenant>"
+   ```
+
+   **Alternative: Create a `.env` file (recommended for persistent use):**
+   ```bash
+   cat << EOF > .env
+   export ARM_CLIENT_ID="<appId>"
+   export ARM_CLIENT_SECRET="<password>"
+   export ARM_SUBSCRIPTION_ID="<YOUR_SUBSCRIPTION_ID>"
+   export ARM_TENANT_ID="<tenant>"
+   EOF
+   
+   # Source the environment variables
+   source .env
+   ```
+
+5. **Verify the service principal can authenticate:**
+   ```bash
+   az login --service-principal \
+     --username $ARM_CLIENT_ID \
+     --password $ARM_CLIENT_SECRET \
+     --tenant $ARM_TENANT_ID
+   ```
+
+### Security Best Practices
+
+- **Store credentials securely**: Never commit the `.env` file or credentials to version control. Add `.env` to your `.gitignore` file:
+  ```bash
+  echo ".env" >> .gitignore
+  ```
+- **Use least privilege**: The Contributor role provides broad permissions. For production, consider creating custom roles with minimal required permissions
+- **Rotate credentials regularly**: Service principal secrets should be rotated periodically
+- **Use Azure Key Vault**: For production deployments, consider storing service principal credentials in Azure Key Vault
+
+
 ## Project Structure
 
 ```
