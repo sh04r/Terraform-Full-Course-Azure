@@ -50,13 +50,13 @@ variable "argocd_namespace" {
 variable "app_repo_url" {
   description = "Repository URL for the application to be deployed via ArgoCD"
   type        = string
-  default     = "https://github.com/argoproj/argocd-example-apps.git"
+  default     = "https://github.com/itsBaivab/gitops-configs.git"
 }
 
 variable "app_repo_path" {
   description = "Path within the repository for the application manifests"
   type        = string
-  default     = "guestbook"
+  default     = "3tire-configs"
 }
 
 # Tags

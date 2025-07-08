@@ -8,7 +8,9 @@ This repository provides a production-ready setup for deploying applications to 
 
 - [Architecture Overview](#-architecture-overview)
 - [Prerequisites](#-prerequisites)
+- [🔄 Complete Recreation Guide](#-complete-recreation-guide)
 - [Quick Start](#-quick-start)
+- [Multi-Environment Setup](#-multi-environment-setup)
 - [Accessing ArgoCD WebUI](#-accessing-argocd-webui)
 - [Deploying Applications](#-deploying-applications)
 - [Verification](#-verification)
@@ -165,21 +167,160 @@ ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_azure -N ""
 
 ---
 
-## ⚡ Quick Start
+## 🔄 Complete Recreation Guide
 
-### Step 1: Set Up Authentication
+### **⚠️ CRITICAL: Follow this exact sequence for successful recreation**
+
+**Before deploying ANY infrastructure, you MUST first set up your GitOps repository. ArgoCD will fail to deploy applications without access to the manifest files.**
+
+---
+
+### 🎯 Step 1: Create Your GitOps Repository (FIRST!)
+
+#### 1.1 Create New GitHub Repository
+
+1. **Go to GitHub.com** and create a new repository:
+   - **Repository name**: `gitops-configs` (or your preferred name)
+   - **Description**: "Kubernetes manifests for 3-tier application GitOps deployment"
+   - **Visibility**: Public (recommended) or Private with proper access configured
+   - ✅ **Initialize with README**
+
+2. **Clone your new repository**:
+   ```bash
+   # Replace YOUR_USERNAME with your GitHub username
+   git clone https://github.com/YOUR_USERNAME/gitops-configs.git
+   cd gitops-configs
+   ```
+
+#### 1.2 Copy and Push Manifest Files
 
 ```bash
-# Option A: Using Service Principal (Recommended for automation)
-export ARM_CLIENT_ID="your-client-id"
-export ARM_CLIENT_SECRET="your-client-secret"
-export ARM_SUBSCRIPTION_ID="your-subscription-id"
-export ARM_TENANT_ID="your-tenant-id"
+# From this project's directory, copy the 3-tier application manifests
+# Make sure you're in the root of this project first
+cd Terraform-Full-Course-Azure/lessons/day28
 
-# Option B: Using Azure CLI (Alternative)
-az login
-az account set --subscription "your-subscription-id"
+# Copy all manifest files to your GitOps repository
+cp -r manifest-files/* /path/to/your/gitops-configs/
+
+# Or if you're already in the gitops-configs directory:
+# cp /path/to/this/project/manifest-files/3tire-configs/* .
+
+# Navigate to your GitOps repository
+cd /path/to/your/gitops-configs
+
+# Verify the files are copied correctly
+ls -la
+.
+├── 3tire-configs
+│   ├── argocd-application.yaml
+│   ├── backend-config.yaml
+│   ├── backend.yaml
+│   ├── frontend-config.yaml
+│   ├── frontend.yaml
+│   ├── kustomization.yaml
+│   ├── namespace.yaml
+│   ├── postgres-config.yaml
+│   ├── postgres-pvc.yaml
+│   └── postgres.yaml
 ```
+
+#### 1.3 Update Repository URL in Manifest Files
+
+**CRITICAL: Update the ArgoCD application to point to YOUR repository:**
+
+```bash
+# Edit the ArgoCD application manifest
+vim argocd-application.yaml
+
+# Find this line (around line 11):
+# repoURL: https://github.com/itsBaivab/gitops-configs.git
+
+# Change it to YOUR repository:
+# repoURL: https://github.com/YOUR_USERNAME/gitops-configs.git
+
+# Save and exit (:wq in vim)
+```
+
+#### 1.4 Commit and Push to Your GitOps Repository
+
+```bash
+# Add all manifest files
+git add .
+
+# Commit with a descriptive message
+git commit -m "ANY COMMIT OF YOUR CHOICE"
+
+# Push to GitHub
+git push origin main
+```
+
+#### 1.5 Verify Your GitOps Repository
+
+```bash
+# Verify your repository is accessible
+curl -s https://api.github.com/repos/YOUR_USERNAME/gitops-configs
+
+---
+
+### 🔧 Step 2: Update Terraform Configuration Files
+
+#### 2.1 Update Repository URLs in ALL Environment Files
+
+**You must update ALL three environment configurations:**
+
+```bash
+# Navigate back to the project directory
+cd /home/baivab/repos/Terraform-Full-Course-Azure/lessons/day28
+
+# Update Development Environment
+vim dev/terraform.tfvars
+# Find line ~15: app_repo_url = "https://github.com/itsBaivab/gitops-configs.git"
+# Change to:     app_repo_url = "https://github.com/YOUR_USERNAME/gitops-configs.git"
+
+# Update Test Environment  
+vim test/terraform.tfvars
+# Find line ~15: app_repo_url = "https://github.com/itsBaivab/gitops-configs.git"
+# Change to:     app_repo_url = "https://github.com/YOUR_USERNAME/gitops-configs.git"
+
+# Update Production Environment
+vim prod/terraform.tfvars  
+# Find line ~15: app_repo_url = "https://github.com/itsBaivab/gitops-configs.git"
+# Change to:     app_repo_url = "https://github.com/YOUR_USERNAME/gitops-configs.git"
+```
+
+#### 2.2 Verify All Repository URLs Are Updated
+
+
+
+#### 2.3 Optional: Customize Resource Names
+
+```bash
+# If you want to use custom resource group and cluster names:
+# Edit each terraform.tfvars file and modify:
+
+# resource_group_name     = "my-custom-aks-rg"
+# kubernetes_cluster_name = "my-custom-aks-cluster"
+
+# Note: Keep environment naming consistent across dev/test/prod
+```
+
+---
+
+### ✅ Step 3: Validation Before Infrastructure Deployment
+
+#### 3.1 Validate GitOps Repository Access
+
+```bash
+# Test that your GitOps repository is publicly accessible
+curl -s https://raw.githubusercontent.com/YOUR_USERNAME/gitops-configs/main/namespace.yaml
+
+# This should return the namespace.yaml content. If you get a 404, check:
+# 1. Repository name is correct
+# 2. Repository is public OR you have access tokens configured
+# 3. Files were pushed to the main branch
+```
+
+
 
 ### Step 2: Configure Remote State Backend (Optional but Recommended)
 
@@ -389,21 +530,20 @@ kubectl port-forward svc/argocd-server -n argocd 8080:80
 
 ## 🎯 Quick Application Access
 
-
-###  Manual Steps
+### Manual Steps
 
 ```bash
 # 1. Check your deployed applications
 kubectl get applications -n argocd
 
-# 2. For the guestbook application, start port forwarding
-kubectl port-forward svc/guestbook-ui -n guestbook-dev 8081:80
+# 2. For the 3-tier web application, start port forwarding to frontend
+kubectl port-forward svc/frontend -n 3tirewebapp-dev 3000:3000
 
 # 3. Open your browser and navigate to:
-# http://localhost:8081
+# http://localhost:3000
 ```
 
-**🎉 Your application is now accessible! Try adding some messages to see the guestbook in action.**
+**🎉 Your 3-tier application is now accessible! This includes a React frontend, Node.js backend, and PostgreSQL database.**
 
 ---
 
@@ -411,17 +551,186 @@ kubectl port-forward svc/guestbook-ui -n guestbook-dev 8081:80
 
 ### 🎯 Quick Access (Recommended)
 ```bash
-# Use the helper script for easiest access
-./access-app.sh
+# Port forward to frontend service for immediate access
+kubectl port-forward svc/frontend -n 3tirewebapp-dev 3000:3000
 ```
 
-### 🔗 All Access Methods
+### 🔗 All Access Methods for Your 3-Tier Application
 
-| Method | Use Case | Command | Access URL |
-|--------|----------|---------|------------|
-| **Port Forward** | Development, Testing | `kubectl port-forward svc/guestbook-ui -n guestbook-dev 8081:80` | `http://localhost:8081` |
-| **LoadBalancer** | External Access | `kubectl patch svc guestbook-ui -n guestbook-dev -p '{"spec":{"type":"LoadBalancer"}}'` | `http://<EXTERNAL-IP>` |
-| **Ingress** | Production, Custom Domain | Create Ingress resource | `http://guestbook.local` |
+| Method | Use Case | Prerequisites | Command/Steps | Access URL |
+|--------|----------|---------------|---------------|------------|
+| **Port Forward** | Development, Testing | kubectl access | `kubectl port-forward svc/frontend -n 3tirewebapp-dev 3000:3000` | `http://localhost:3000` |
+| **Ingress (Built-in)** | Production-like, Domain Access | NGINX Ingress Controller + /etc/hosts | Install NGINX Ingress + configure hosts file | `http://3tirewebapp-dev.local` |
+| **LoadBalancer** | External Cloud Access | Azure LoadBalancer support | Patch service to LoadBalancer type | `http://<EXTERNAL-IP>:3000` |
+| **NodePort** | Direct Node Access | Node IP access | Patch service to NodePort type | `http://<NODE-IP>:<NodePort>` |
+
+#### 🏆 Recommended Access Methods by Environment
+
+- **Development**: Port Forward (fastest setup)
+- **Testing/Staging**: Built-in Ingress (production-like)
+- **Production**: Ingress with real domain + TLS
+- **Demo/External**: LoadBalancer (public access)
+
+### 🌐 Using the Built-in Ingress (Recommended for Production-like Testing)
+
+Your manifest already includes an Ingress configuration! Here's how to use it:
+
+#### 📋 Your Ingress Configuration
+
+Your `frontend.yaml` manifest includes this built-in Ingress resource:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frontend-ingress
+  namespace: 3tirewebapp-dev
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: 3tirewebapp-dev.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 3000
+```
+
+**Key Features:**
+- **Host**: `3tirewebapp-dev.local` (customizable domain for local testing)
+- **Path**: `/` (root path routing to frontend)
+- **Target Service**: `frontend` service on port `3000`
+- **Ingress Class**: `nginx` (requires NGINX Ingress Controller)
+- **Rewrite Target**: Root path rewriting for clean URLs
+- **Path Type**: `Prefix` matching for flexible routing
+
+#### Step 1: Install NGINX Ingress Controller
+
+```bash
+# Install NGINX Ingress Controller
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
+
+# Wait for ingress controller to be ready
+kubectl wait --namespace ingress-nginx \
+  --for=condition=ready pod \
+  --selector=app.kubernetes.io/component=controller \
+  --timeout=90s
+
+# Check ingress controller service
+kubectl get svc -n ingress-nginx
+```
+
+#### Step 2: Configure Local Domain (for local testing)
+
+```bash
+# Get the ingress external IP
+INGRESS_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+echo "Ingress IP: $INGRESS_IP"
+
+# Add to /etc/hosts for local domain resolution
+echo "$INGRESS_IP 3tirewebapp-dev.local" | sudo tee -a /etc/hosts
+
+# Verify the ingress is working
+kubectl get ingress -n 3tirewebapp-dev
+```
+
+#### Step 3: Access via Domain
+
+```bash
+# Open your browser to:
+# http://3tirewebapp-dev.local
+
+# Or test with curl
+curl -H "Host: 3tirewebapp-dev.local" http://$INGRESS_IP
+```
+
+### 🚀 Alternative Access Methods
+
+#### Method 1: LoadBalancer (External Cloud Access)
+
+```bash
+# Patch the frontend service to use LoadBalancer type
+kubectl patch svc frontend -n 3tirewebapp-dev -p '{"spec":{"type":"LoadBalancer"}}'
+
+# Wait for external IP assignment (may take 2-5 minutes)
+echo "Waiting for external IP..."
+kubectl get svc frontend -n 3tirewebapp-dev --watch
+
+# Get the external IP and access your application
+EXTERNAL_IP=$(kubectl get svc frontend -n 3tirewebapp-dev -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+echo "Access your application at: http://$EXTERNAL_IP:3000"
+
+# To revert back to ClusterIP:
+kubectl patch svc frontend -n 3tirewebapp-dev -p '{"spec":{"type":"ClusterIP"}}'
+```
+
+#### Method 2: NodePort (Direct Node Access)
+
+```bash
+# Patch the frontend service to use NodePort type
+kubectl patch svc frontend -n 3tirewebapp-dev -p '{"spec":{"type":"NodePort"}}'
+
+# Get the NodePort and Node IP
+NODE_PORT=$(kubectl get svc frontend -n 3tirewebapp-dev -o jsonpath='{.spec.ports[0].nodePort}')
+NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[0].address}')
+
+echo "Access your application at: http://$NODE_IP:$NODE_PORT"
+
+# To revert back to ClusterIP:
+kubectl patch svc frontend -n 3tirewebapp-dev -p '{"spec":{"type":"ClusterIP"}}'
+```
+
+### 🔍 Your 3-Tier Application Architecture
+
+Your deployed application consists of:
+
+#### **Frontend (React Application)**
+- **Service**: `frontend` on port 3000 (ClusterIP)
+- **Container**: `itsbaivab/frontend:v2`
+- **Features**: React-based web interface with Express.js proxy server
+- **Ingress**: Pre-configured with domain `3tirewebapp-dev.local`
+- **Health Checks**: HTTP probes on `/` endpoint with liveness/readiness checks
+- **Resources**: 100m CPU request, 200m CPU limit, 128Mi-256Mi memory
+
+#### **Backend (Node.js API)**
+- **Service**: `backend` on port 8080 (ClusterIP)
+- **Container**: `itsbaivab/backend:latest`
+- **Database Connection**: Connects to PostgreSQL via ConfigMap/Secret settings
+- **API Endpoints**: Health check on `/health`, business logic APIs
+- **Frontend Integration**: Backend URL configured as `http://backend:8080`
+- **Resources**: 100m CPU request, 200m CPU limit, 128Mi-256Mi memory
+
+#### **Database (PostgreSQL)**
+- **Service**: `postgres` on port 5432 (ClusterIP)
+- **Container**: `postgres:15`
+- **Persistence**: Uses `postgres-pvc` persistent volume for data storage
+- **Database**: `goalsdb` with user `postgres`
+- **Configuration**: Environment variables managed via ConfigMaps and Secrets
+
+### 🎯 Application Flow Testing
+
+```bash
+# 1. Test Frontend Access
+kubectl port-forward svc/frontend -n 3tirewebapp-dev 3000:3000 &
+curl -s http://localhost:3000 | grep -i "title\|app" || echo "Frontend responded"
+
+# 2. Test Backend API
+kubectl port-forward svc/backend -n 3tirewebapp-dev 8080:8080 &
+curl -s http://localhost:8080/health || echo "Backend health check"
+
+# 3. Test Database Connection (from within cluster)
+kubectl exec -it deployment/backend -n 3tirewebapp-dev -- \
+  psql -h postgres -U postgres -d goalsdb -c "SELECT version();"
+
+# Stop background port forwards
+kill %1 %2
+```
 
 
 ### 🚀 Next Steps
@@ -429,6 +738,35 @@ kubectl port-forward svc/guestbook-ui -n guestbook-dev 8081:80
 2. **Monitor via ArgoCD**: Check sync status and health
 3. **Deploy More Apps**: Use the GitOps pattern for your applications  
 4. **Scale to Production**: Deploy test and prod environments
+
+## 🌐 Frontend Ingress Configuration Summary
+
+Your 3-tier application includes a **production-ready ingress configuration** with the following features:
+
+### **🔧 Built-in Ingress Features**
+- **Pre-configured Domain**: `3tirewebapp-dev.local` (customizable for your environment)
+- **NGINX Ingress Controller**: Uses industry-standard `nginx` ingress class
+- **Path-based Routing**: Root path (`/`) routes to frontend service
+- **Clean URL Rewriting**: Automatic path rewriting for seamless user experience
+- **Service Integration**: Direct connection to `frontend` service on port `3000`
+
+### **🚀 Access Methods Comparison**
+
+| Method | Best For | Setup Time | External Access | Domain Name | Production Ready |
+|--------|----------|------------|-----------------|-------------|------------------|
+| **Port Forward** | Development & Testing | Immediate | No | localhost | No |
+| **Ingress** | Staging & Production | 5 minutes | Yes | Custom domain | ✅ Yes |
+| **LoadBalancer** | Cloud demos | 3 minutes | Yes | IP address | Partial |
+| **NodePort** | Local clusters | 1 minute | Limited | IP:Port | No |
+
+### **🔐 Production Considerations**
+
+For production deployment, consider these enhancements:
+- **TLS/SSL**: Add `tls` section to ingress for HTTPS
+- **Real Domain**: Replace `3tirewebapp-dev.local` with your actual domain
+- **WAF Integration**: Use cloud WAF services for additional security
+- **Rate Limiting**: Configure ingress annotations for rate limiting
+- **Health Checks**: Ingress controller monitors pod health automatically
 
 ---
 
@@ -474,7 +812,7 @@ EOF
 
 ---
 
-## 🌍 Accessing Deployed Application WebUI
+## 🌍 Accessing Your 3-Tier Web Application
 
 ### Check Deployed Applications
 
@@ -483,213 +821,230 @@ EOF
 kubectl get applications -n argocd
 
 # Check application details and sync status
-kubectl describe application guestbook-dev -n argocd
+kubectl describe application 3tirewebapp-dev -n argocd
 
 # Verify application pods and services are running
-kubectl get pods,svc -n guestbook-dev
+kubectl get pods,svc -n 3tirewebapp-dev
 
 # Expected output:
 # NAME                                READY   STATUS    RESTARTS   AGE
-# pod/guestbook-ui-85db984648-xxxxx   1/1     Running   0          20m
+# pod/backend-xxxxxxxxxx-xxxxx        1/1     Running   0          20m
+# pod/frontend-xxxxxxxxx-xxxxx        1/1     Running   0          20m  
+# pod/postgres-xxxxxxxxx-xxxxx        1/1     Running   0          20m
 # 
-# NAME                   TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE
-# service/guestbook-ui   ClusterIP   10.0.225.136   <none>        80/TCP    20m
+# NAME               TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
+# service/backend    ClusterIP   10.0.225.136   <none>        8080/TCP   20m
+# service/frontend   ClusterIP   10.0.225.137   <none>        3000/TCP   20m
+# service/postgres   ClusterIP   10.0.225.138   <none>        5432/TCP   20m
 ```
 
-### Access Application WebUI
+### Access Your 3-Tier Application
 
-The deployed guestbook application runs as a ClusterIP service by default. Here are three methods to access it:
+Your deployed 3-tier application runs with ClusterIP services by default, which provides internal cluster communication. Here are multiple methods to access it externally:
 
-#### Method 1: Port Forward (Recommended for Development)
+#### Method 1: Port Forward to Frontend (Recommended for Development)
 
 ```bash
-# Start port forwarding for the guestbook application
-kubectl port-forward svc/guestbook-ui -n guestbook-dev 8081:80
+# Start port forwarding for the frontend application
+kubectl port-forward svc/frontend -n 3tirewebapp-dev 3000:3000
 
 # Keep this terminal open and open your browser to:
-# http://localhost:8081
+# http://localhost:3000
 
-# You should see the guestbook interface where you can:
-# - Add new messages
-# - View existing messages
-# - See real-time updates
+# This provides access to your complete 3-tier stack:
+# ✅ React frontend (served by Express.js at localhost:3000)
+# ✅ Node.js backend API (proxied via frontend at /api/* routes)  
+# ✅ PostgreSQL database (connected via backend)
 ```
 
+#### Method 2: Using the Built-in Ingress (Production-like Access)
 
-#### Method 2: Expose Application via LoadBalancer
-
-For external access without port forwarding:
-
-```bash
-# Patch the service to use LoadBalancer type
-kubectl patch svc guestbook-ui -n guestbook-dev -p '{"spec":{"type":"LoadBalancer"}}'
-
-# Wait for external IP assignment (may take 2-5 minutes)
-echo "Waiting for external IP..."
-kubectl get svc guestbook-ui -n guestbook-dev --watch
-
-# Once you see an external IP, access the application:
-EXTERNAL_IP=$(kubectl get svc guestbook-ui -n guestbook-dev -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-echo "Access your application at: http://$EXTERNAL_IP"
-
-# To revert back to ClusterIP:
-# kubectl patch svc guestbook-ui -n guestbook-dev -p '{"spec":{"type":"ClusterIP"}}'
-```
-
-#### Method 3: Expose Application via Ingress (Production Ready)
-
-For production deployments with custom domains:
+Your application already includes an Ingress configuration for domain-based access:
 
 ```bash
-# First, install NGINX Ingress Controller (if not already installed)
+# 1. Install NGINX Ingress Controller (if not already installed)
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
 
-# Wait for ingress controller to be ready
+# 2. Wait for ingress controller to be ready
 kubectl wait --namespace ingress-nginx \
   --for=condition=ready pod \
   --selector=app.kubernetes.io/component=controller \
   --timeout=90s
 
-# Create an ingress for the application
-kubectl apply -f - <<EOF
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: guestbook-ingress
-  namespace: guestbook-dev
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-spec:
-  ingressClassName: nginx
-  rules:
-  - host: guestbook.local
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: guestbook-ui
-            port:
-              number: 80
-EOF
-
-# Get the ingress external IP
+# 3. Get ingress external IP (may take 2-5 minutes)
 INGRESS_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
 echo "Ingress IP: $INGRESS_IP"
 
-# Add to /etc/hosts for local testing
-echo "$INGRESS_IP guestbook.local" | sudo tee -a /etc/hosts
+# 4. Configure local domain resolution for testing
+echo "$INGRESS_IP 3tirewebapp-dev.local" | sudo tee -a /etc/hosts
 
-# Access via: http://guestbook.local
-echo "Access your application at: http://guestbook.local"
+# 5. Access via domain in your browser:
+# http://3tirewebapp-dev.local
+echo "✅ Access your application at: http://3tirewebapp-dev.local"
 ```
 
-### Application Features & Testing
+#### Method 3: Expose Frontend via LoadBalancer (External Cloud Access)
 
-The deployed guestbook application provides:
-
-- **📝 Frontend Interface**: Clean, responsive web UI for message management
-- **💾 Message Storage**: In-memory storage for demo purposes (messages reset on pod restart)
-- **⚡ Real-time Updates**: Messages appear instantly after submission
-- **🎨 Simple Design**: Minimalist interface perfect for testing GitOps workflows
-
-### Test Your Application
+For direct external cloud access without domain configuration:
 
 ```bash
-# Method 1: Browser Testing
-# 1. Open http://localhost:8081 (if using port forwarding)
-# 2. Add a test message: "Hello from AKS GitOps!"
-# 3. Verify the message appears in the list
-# 4. Add multiple messages to test functionality
+# Patch the frontend service to use LoadBalancer type
+kubectl patch svc frontend -n 3tirewebapp-dev -p '{"spec":{"type":"LoadBalancer"}}'
 
-# Method 2: API Testing (if application supports REST API)
-curl -X POST http://localhost:8081/api/messages \
-  -H "Content-Type: application/json" \
-  -d '{"message": "Hello from curl!"}'
+# Wait for external IP assignment (may take 2-5 minutes)
+echo "⏳ Waiting for external IP assignment..."
+kubectl get svc frontend -n 3tirewebapp-dev --watch
 
-# Method 3: Load Testing (optional)
-# Install Apache Bench: sudo apt-get install apache2-utils
-ab -n 100 -c 10 http://localhost:8081/
+# Once you see an external IP, access the application:
+EXTERNAL_IP=$(kubectl get svc frontend -n 3tirewebapp-dev -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+echo "✅ Access your application at: http://$EXTERNAL_IP:3000"
+
+# To revert back to ClusterIP (cleanup):
+kubectl patch svc frontend -n 3tirewebapp-dev -p '{"spec":{"type":"ClusterIP"}}'
 ```
 
-### Verify Application Health
+### Application Architecture & Features
+
+Your deployed 3-tier application provides:
+
+#### **🎨 Frontend (React + Express.js)**
+- **Port**: 3000
+- **Architecture**: React app served by Express.js proxy server
+- **Backend Integration**: Communicates with Node.js API via `/api/*` routes
+- **Ingress Ready**: Pre-configured for domain-based access at `3tirewebapp-dev.local`
+- **Health Checks**: HTTP probes on `/` endpoint for kubernetes monitoring
+- **Features**: Modern React-based web interface with API proxy functionality
+
+#### **🔧 Backend (Node.js API)**
+- **Port**: 8080  
+- **Architecture**: RESTful API server with Express.js framework
+- **Database Integration**: Connects to PostgreSQL using environment variables
+- **Health Endpoint**: Provides `/health` endpoint for monitoring and probes
+- **Configuration**: Database connection managed via ConfigMaps and Secrets
+- **Features**: Full CRUD operations, database connectivity, health monitoring
+
+#### **🗄️ Database (PostgreSQL)**
+- **Port**: 5432
+- **Version**: PostgreSQL 15
+- **Database**: `goalsdb` with user `postgres`
+- **Persistence**: Persistent volume claim ensures data survives pod restarts
+- **Configuration**: Connection parameters managed via ConfigMaps and Secrets
+- **Features**: Full relational database with ACID compliance
+
+### Test Your 3-Tier Application
 
 ```bash
-# Check pod status and readiness
-kubectl get pods -n guestbook-dev
-kubectl describe pod -l app=guestbook-ui -n guestbook-dev
+# Method 1: Frontend Browser Testing (Recommended)
+# 1. Use port forwarding: kubectl port-forward svc/frontend -n 3tirewebapp-dev 3000:3000
+# 2. Open browser to: http://localhost:3000
+# 3. Test the web interface functionality
+# 4. Verify frontend-backend communication through UI interactions
+# 5. Check database interactions via application features
 
-# Check application logs for any issues
-kubectl logs -l app=guestbook-ui -n guestbook-dev --tail=50
-
-# Verify service endpoints are working
-kubectl get endpoints guestbook-ui -n guestbook-dev
-
-# Test application connectivity from within cluster
-kubectl run debug-pod --image=curlimages/curl --rm -it --restart=Never -- \
-  curl -s http://guestbook-ui.guestbook-dev.svc.cluster.local
-
-# Health check with port forwarding
-kubectl port-forward svc/guestbook-ui -n guestbook-dev 8081:80 &
-sleep 3
-curl -s http://localhost:8081 | grep -i "guestbook\|welcome\|message" || echo "Application responded"
+# Method 2: API Testing (Backend Direct)
+kubectl port-forward svc/backend -n 3tirewebapp-dev 8080:8080 &
+echo "Testing backend health endpoint..."
+curl -X GET http://localhost:8080/health
+echo "Testing backend API endpoints..."
+curl -X GET http://localhost:8080/api/goals  # or your specific API endpoints
 kill %1  # Stop background port forwarding
+
+# Method 3: Database Connection Testing (Internal)
+echo "Testing database connectivity from backend pod..."
+kubectl exec -it deployment/backend -n 3tirewebapp-dev -- \
+  psql -h postgres -U postgres -d goalsdb -c "SELECT version();"
+
+# Method 4: Full Stack Communication Test
+kubectl run debug-pod --image=curlimages/curl --rm -it --restart=Never -- \
+  curl -s http://frontend.3tirewebapp-dev.svc.cluster.local:3000
+```
+
+### Verify Application Health & Communication
+
+```bash
+# Check all pods are running and ready
+kubectl get pods -n 3tirewebapp-dev
+kubectl describe pods -n 3tirewebapp-dev
+
+# Check application logs
+kubectl logs deployment/frontend -n 3tirewebapp-dev --tail=50
+kubectl logs deployment/backend -n 3tirewebapp-dev --tail=50
+kubectl logs deployment/postgres -n 3tirewebapp-dev --tail=50
+
+# Verify service endpoints
+kubectl get endpoints -n 3tirewebapp-dev
+
+# Test internal service communication
+kubectl run debug-pod --image=curlimages/curl --rm -it --restart=Never -- \
+  curl -s http://frontend.3tirewebapp-dev.svc.cluster.local:3000
+
+kubectl run debug-pod --image=curlimages/curl --rm -it --restart=Never -- \
+  curl -s http://backend.3tirewebapp-dev.svc.cluster.local:8080/health
 ```
 
 ### Troubleshooting Application Access
 
 #### Common Issues and Solutions
 
-**1. Port Forward Connection Refused**
+**1. Frontend Port Forward Connection Refused**
 ```bash
-# Check if service exists and has endpoints
-kubectl get svc,endpoints -n guestbook-dev
+# Check if frontend service exists and has endpoints
+kubectl get svc,endpoints frontend -n 3tirewebapp-dev
 
-# Verify pod is running and ready
-kubectl get pods -n guestbook-dev
-kubectl logs -l app=guestbook-ui -n guestbook-dev
+# Verify frontend pod is running and ready
+kubectl get pods -l app=frontend -n 3tirewebapp-dev
+kubectl logs deployment/frontend -n 3tirewebapp-dev
 
 # Try different local port
-kubectl port-forward svc/guestbook-ui -n guestbook-dev 8082:80
+kubectl port-forward svc/frontend -n 3tirewebapp-dev 3001:3000
 ```
 
-**2. Application Not Loading in Browser**
+**2. Application Shows Backend Connection Error**
 ```bash
-# Check if port forwarding is active
-netstat -tulpn | grep :8081
-lsof -i :8081
+# Check backend service connectivity
+kubectl get svc backend -n 3tirewebapp-dev
+kubectl get pods -l app=backend -n 3tirewebapp-dev
 
-# Test with curl first
-curl -v http://localhost:8081
+# Verify backend configuration
+kubectl describe configmap frontend-config -n 3tirewebapp-dev
+kubectl describe configmap backend-config -n 3tirewebapp-dev
 
-# Check for firewall issues
-sudo ufw status
+# Test backend API directly
+kubectl port-forward svc/backend -n 3tirewebapp-dev 8080:8080 &
+curl -v http://localhost:8080/health
+kill %1
 ```
 
-**3. LoadBalancer External IP Pending**
+**3. Database Connection Issues**
 ```bash
-# Check if LoadBalancer service is supported
-kubectl describe svc guestbook-ui -n guestbook-dev
+# Check PostgreSQL pod and service
+kubectl get pods -l app=postgres -n 3tirewebapp-dev
+kubectl get svc postgres -n 3tirewebapp-dev
 
-# Check Azure Load Balancer configuration
-az network lb list --resource-group MC_*
+# Check database credentials and configuration
+kubectl describe secret postgres-secret -n 3tirewebapp-dev
+kubectl describe configmap postgres-config -n 3tirewebapp-dev
 
-# Fall back to port forwarding
-kubectl patch svc guestbook-ui -n guestbook-dev -p '{"spec":{"type":"ClusterIP"}}'
+# Test database connection from backend pod
+kubectl exec -it deployment/backend -n 3tirewebapp-dev -- \
+  nc -z postgres 5432 && echo "Database reachable" || echo "Database unreachable"
 ```
 
-**4. Application Shows Error or Empty Page**
+**4. Ingress Domain Not Resolving**
 ```bash
-# Check application logs for errors
-kubectl logs -l app=guestbook-ui -n guestbook-dev --tail=100
+# Check if ingress controller is running
+kubectl get pods -n ingress-nginx
+kubectl get svc -n ingress-nginx
 
-# Restart the application pod
-kubectl rollout restart deployment/guestbook-ui -n guestbook-dev
+# Verify ingress resource
+kubectl get ingress -n 3tirewebapp-dev
+kubectl describe ingress frontend-ingress -n 3tirewebapp-dev
 
-# Check if ArgoCD sync is healthy
-kubectl describe application guestbook-dev -n argocd
+# Check /etc/hosts entry
+grep "3tirewebapp-dev.local" /etc/hosts
+
+# Test with curl using Host header
+curl -H "Host: 3tirewebapp-dev.local" http://<INGRESS-IP>
 ```
 
 ---

@@ -21,6 +21,22 @@
             --success: #4caf50;
         }
 
+        /* Dark theme variables */
+        [data-theme="dark"] {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #1e1b4b;
+            --secondary: #ef4444;
+            --secondary-dark: #dc2626;
+            --secondary-light: #450a0a;
+            --text: #f8fafc;
+            --text-light: #cbd5e1;
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --border: #475569;
+            --success: #10b981;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -35,9 +51,13 @@
             color: var(--text);
             line-height: 1.6;
             min-height: 100vh;
+            transition: all 0.5s ease;
         }
 
-        /* Improved container glassmorphism - REMOVED float animation */
+        /* Dark theme background */
+        [data-theme="dark"] body {
+            background: linear-gradient(135deg, #000000 0%, #1a1a1a 50%, #2d2d2d 100%);
+        }        /* Improved container glassmorphism - REMOVED float animation */
         .container {
             width: 90%;
             max-width: 800px;
@@ -48,13 +68,22 @@
             -webkit-backdrop-filter: blur(20px);
             border-radius: 24px;
             border: 1px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 
+            box-shadow:
                 0 10px 30px rgba(0, 0, 0, 0.1),
                 0 1px 2px rgba(255, 255, 255, 0.3) inset;
-            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             will-change: transform, box-shadow;
             overflow: hidden;
             position: relative;
+        }
+
+        /* Dark theme container adjustments - keep original glassmorphism */
+        [data-theme="dark"] .container {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow:
+                0 10px 30px rgba(0, 0, 0, 0.1),
+                0 1px 2px rgba(255, 255, 255, 0.3) inset;
         }
 
         /* Add subtle background pattern */
@@ -198,7 +227,31 @@
             transform: translateX(5px);
         }
 
-        /* Improved add button with liquid effect */
+        /* Dark theme input and button adjustments - keep original styling */
+        [data-theme="dark"] input[type="text"] {
+            background-color: transparent;
+            color: var(--text);
+        }
+
+        [data-theme="dark"] input[type="text"]::placeholder {
+            color: rgba(248, 250, 252, 0.6);
+        }
+
+        [data-theme="dark"] .add-btn {
+            background: linear-gradient(45deg, var(--primary), var(--primary-dark));
+        }
+
+        [data-theme="dark"] .input-group {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        [data-theme="dark"] .input-group:focus-within {
+            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        /* Enhanced add button with liquid effect */
         .add-btn {
             padding: 0 25px;
             background: linear-gradient(45deg, var(--primary), var(--primary-dark));
@@ -293,6 +346,17 @@
             will-change: transform, opacity;
             position: relative;
             overflow: hidden;
+        }
+
+        /* Dark theme goal item adjustments - keep original styling */
+        [data-theme="dark"] .goal-item {
+            background-color: rgba(255, 255, 255, 0.15);
+            border-left: 4px solid var(--primary);
+        }
+
+        [data-theme="dark"] .goal-item:hover {
+            background-color: rgba(255, 255, 255, 0.25);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
         }
 
         /* Add subtle hover light effect */
@@ -426,6 +490,12 @@
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
         }
 
+        /* Dark theme empty state adjustments - keep original styling */
+        [data-theme="dark"] .empty-state {
+            background-color: rgba(238, 240, 255, 0.15);
+            border: 1px dashed rgba(99, 102, 241, 0.3);
+        }
+
         /* Add subtle animation to empty state */
         .empty-state p {
             position: relative;
@@ -450,6 +520,12 @@
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Dark theme footer adjustments - keep original styling */
+        [data-theme="dark"] footer {
+            background-color: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
@@ -485,6 +561,45 @@
             transform-origin: left;
         }
 
+        /* Theme toggle button */
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border: none;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            color: var(--text);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Dark theme toggle button adjustments - keep original styling */
+        [data-theme="dark"] .theme-toggle {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .theme-toggle:active {
+            transform: scale(0.95);
+        }
+
         /* Add slideIn animation */
         @keyframes slideIn {
             from {
@@ -506,6 +621,11 @@
 </head>
 
 <body>
+    <!-- Theme Toggle Button -->
+    <button class="theme-toggle" id="theme-toggle" title="Toggle dark/light theme">
+        🌙
+    </button>
+
     <div class="container">
         <div class="header">
             <img src="https://dka798bhdh3k6.cloudfront.net/cloudops-logo-bg-removed.png" alt="DevDotCom Logo" class="logo">
@@ -534,7 +654,37 @@
         // Load goals when the page loads
         document.addEventListener('DOMContentLoaded', function() {
             loadGoals();
+            initThemeToggle();
         });
+
+        // Theme toggle functionality
+        function initThemeToggle() {
+            const themeToggle = document.getElementById('theme-toggle');
+            const body = document.body;
+            
+            // Check for saved theme preference or default to light mode
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            setTheme(savedTheme);
+            
+            // Theme toggle event listener
+            themeToggle.addEventListener('click', function() {
+                const currentTheme = body.getAttribute('data-theme') || 'light';
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                setTheme(newTheme);
+            });
+        }
+
+        function setTheme(theme) {
+            const body = document.body;
+            const themeToggle = document.getElementById('theme-toggle');
+            
+            body.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            
+            // Update toggle button icon
+            themeToggle.textContent = theme === 'light' ? '🌙' : '☀️';
+            themeToggle.title = `Switch to ${theme === 'light' ? 'dark' : 'light'} theme`;
+        }
 
         // Function to load goals from the API
         function loadGoals() {
