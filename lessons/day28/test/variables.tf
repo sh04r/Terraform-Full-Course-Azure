@@ -67,3 +67,29 @@ variable "tags" {
     ManagedBy   = "Terraform"
   }
 }
+
+# Key Vault Configuration
+variable "enable_key_vault" {
+  description = "Enable Azure Key Vault for storing sensitive data"
+  type        = bool
+  default     = true
+}
+
+variable "key_vault_sku" {
+  description = "SKU for the Key Vault"
+  type        = string
+  default     = "standard"
+}
+
+# Database Configuration for Key Vault
+variable "postgres_username" {
+  description = "PostgreSQL username"
+  type        = string
+  default     = "postgres"
+}
+
+variable "postgres_database" {
+  description = "PostgreSQL database name"
+  type        = string
+  default     = "goalsdb"
+}

@@ -73,3 +73,36 @@ variable "tags" {
     ManagedBy   = "Terraform"
   }
 }
+
+# Key Vault Configuration
+variable "enable_key_vault" {
+  description = "Enable Key Vault for secrets management"
+  type        = bool
+  default     = true
+}
+
+variable "key_vault_sku" {
+  description = "Key Vault SKU"
+  type        = string
+  default     = "standard"
+}
+
+# Database Configuration
+variable "postgres_username" {
+  description = "PostgreSQL admin username"
+  type        = string
+  default     = "postgres"
+}
+
+variable "postgres_password" {
+  description = "PostgreSQL admin password"
+  type        = string
+  sensitive   = true
+  default     = "SecurePassword123!"
+}
+
+variable "postgres_database" {
+  description = "PostgreSQL database name"
+  type        = string
+  default     = "goalsdb"
+}

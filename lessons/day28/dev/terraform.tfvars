@@ -20,3 +20,12 @@ tags = {
   Project     = "AKS-GitOps"
   ManagedBy   = "Terraform"
 }
+
+# Key Vault Configuration
+enable_key_vault = true
+key_vault_sku    = "standard"
+
+# Database Credentials (will be stored in Key Vault)
+postgres_username = "postgres"
+postgres_password = "SecurePassword123!"
+postgres_database = "goalsdb"
