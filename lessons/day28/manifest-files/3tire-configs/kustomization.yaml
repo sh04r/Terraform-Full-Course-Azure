@@ -1,25 +1,35 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-resources:
-  - namespace.yaml
-  - postgres-config.yaml
-  - postgres-pvc.yaml
-  - postgres-keyvault.yaml # Updated to use Key Vault integration
-  - backend-config.yaml
-  - backend-keyvault.yaml # Updated to use Key Vault credentials
-  - frontend-config.yaml
-  - frontend.yaml
-  - key-vault-secrets.yaml
-
+# Target namespace for all resources
 namespace: 3tirewebapp-dev
 
-commonLabels:
-  app.kubernetes.io/name: 3tirewebapp
-  app.kubernetes.io/part-of: 3tirewebapp
+# Resources to include
+resources:
+  - namespace.yaml
+  - postgres-complete.yaml
+  - backend-complete.yaml
+  - frontend-complete.yaml
+  - external-secrets-placeholder.yaml
 
+# Common annotations applied to all resources
+commonAnnotations:
+  app.kubernetes.io/version: "1.0"
+
+# Centralized image management
 images:
   - name: itsbaivab/frontend
     newTag: v2
   - name: itsbaivab/backend
     newTag: latest
+  - name: postgres
+    newTag: "15"
+
+# Resource configurations - replica scaling only
+replicas:
+  - name: frontend
+    count: 2
+  - name: backend
+    count: 2
+  - name: postgres
+    count: 1

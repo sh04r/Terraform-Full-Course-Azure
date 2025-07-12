@@ -79,15 +79,15 @@ resource "null_resource" "goal_tracker_app" {
   triggers = {
     cluster_id       = azurerm_kubernetes_cluster.main.id
     argocd_ready     = helm_release.argocd.status
-    script_hash      = filemd5("${path.module}/deploy-argocd-app.sh")
-    manifest_hash    = filemd5("${path.module}/argocd-app-manifest.yaml")
+    script_hash      = filemd5("${path.module}/scripts/deploy-argocd-app.sh")
+    manifest_hash    = filemd5("${path.module}/manifests/argocd-app-manifest.yaml")
     environment      = var.environment
     argocd_namespace = var.argocd_namespace
   }
 
   provisioner "local-exec" {
     working_dir = path.module
-    command     = "./deploy-argocd-app.sh"
+    command     = "./scripts/deploy-argocd-app.sh"
 
     environment = {
       ENVIRONMENT      = var.environment

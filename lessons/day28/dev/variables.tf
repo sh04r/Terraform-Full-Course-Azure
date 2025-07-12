@@ -87,6 +87,15 @@ variable "key_vault_sku" {
   default     = "standard"
 }
 
+# External Secrets Configuration
+# External Secrets Configuration (using null_resource approach)
+# variable "enable_external_secrets" {
+#   description = "Enable External Secrets Operator for dynamic secret management"
+#   type        = bool
+#   default     = false
+# }
+# Note: External Secrets Operator is now deployed via null_resource to avoid chicken-egg problem
+
 # Database Configuration
 variable "postgres_username" {
   description = "PostgreSQL admin username"

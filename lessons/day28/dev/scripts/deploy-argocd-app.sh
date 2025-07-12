@@ -39,7 +39,7 @@ kubectl get pods -n ${ARGOCD_NAMESPACE} -l app.kubernetes.io/name=argocd-server
 
 # Apply the ArgoCD application using envsubst to replace variables
 echo "📝 Creating ArgoCD Application..."
-envsubst < argocd-app-manifest.yaml | kubectl apply -f -
+envsubst < manifests/argocd-app-manifest.yaml | kubectl apply -f -
 
 # Wait for application to be created
 echo "✅ Verifying ArgoCD Application creation..."

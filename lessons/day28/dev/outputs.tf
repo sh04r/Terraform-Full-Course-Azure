@@ -92,6 +92,22 @@ output "cluster_identity_principal_id" {
   value       = azurerm_kubernetes_cluster.main.identity[0].principal_id
 }
 
+# Additional outputs needed for Secret Provider Class
+output "tenant_id" {
+  description = "Azure tenant ID"
+  value       = data.azurerm_client_config.current.tenant_id
+}
+
+output "kubelet_identity_client_id" {
+  description = "Client ID of the AKS kubelet managed identity"
+  value       = azurerm_kubernetes_cluster.main.kubelet_identity[0].client_id
+}
+
+output "kubelet_identity_object_id" {
+  description = "Object ID of the AKS kubelet managed identity"
+  value       = azurerm_kubernetes_cluster.main.kubelet_identity[0].object_id
+}
+
 # Instructions for using Key Vault secrets
 output "key_vault_access_instructions" {
   description = "Instructions for accessing Key Vault secrets"
