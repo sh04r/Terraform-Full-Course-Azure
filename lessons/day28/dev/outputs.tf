@@ -15,21 +15,6 @@ output "kube_config" {
   sensitive   = true
 }
 
-output "argocd_server_ip" {
-  description = "ArgoCD server external IP"
-  value       = "Run 'kubectl get svc argocd-server -n argocd' to get the external IP"
-}
-
-# Commented out since Log Analytics workspace is optional
-# output "log_analytics_workspace_id" {
-#   description = "Log Analytics workspace ID"
-#   value       = azurerm_log_analytics_workspace.main.id
-# }
-
-output "argocd_admin_password" {
-  description = "ArgoCD admin password command"
-  value       = "Run 'kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath=\"{.data.password}\" | base64 -d' to get the admin password"
-}
 
 output "resource_group_name" {
   description = "Name of the resource group"
@@ -81,12 +66,6 @@ output "postgres_connection_string_secret_name" {
   value       = var.enable_key_vault ? azurerm_key_vault_secret.postgres_connection_string[0].name : null
 }
 
-# Cluster secret references
-output "aks_admin_kubeconfig_secret_name" {
-  description = "Name of the AKS admin kubeconfig secret in Key Vault"
-  value       = var.enable_key_vault ? azurerm_key_vault_secret.aks_admin_kubeconfig[0].name : null
-}
-
 output "cluster_identity_principal_id" {
   description = "Principal ID of the AKS cluster managed identity"
   value       = azurerm_kubernetes_cluster.main.identity[0].principal_id
@@ -106,14 +85,4 @@ output "kubelet_identity_client_id" {
 output "kubelet_identity_object_id" {
   description = "Object ID of the AKS kubelet managed identity"
   value       = azurerm_kubernetes_cluster.main.kubelet_identity[0].object_id
-}
-
-# Instructions for using Key Vault secrets
-output "key_vault_access_instructions" {
-  description = "Instructions for accessing Key Vault secrets"
-  value = var.enable_key_vault ? [
-    "To retrieve database password: az keyvault secret show --vault-name ${azurerm_key_vault.main[0].name} --name postgres-password --query value -o tsv",
-    "To retrieve kubeconfig: az keyvault secret show --vault-name ${azurerm_key_vault.main[0].name} --name aks-admin-kubeconfig --query value -o tsv > ~/.kube/config-${var.environment}",
-    "To list all secrets: az keyvault secret list --vault-name ${azurerm_key_vault.main[0].name} --query '[].name' -o tsv"
-  ] : []
 }
