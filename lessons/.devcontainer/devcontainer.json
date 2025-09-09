@@ -1,0 +1,22 @@
+{
+    "name": "Terraform Environment",
+    "build": {
+        "dockerfile": "Dockerfile",
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "hashicorp.terraform",
+                "github.vscode-pull-request-github"
+            ],
+            "settings": {
+                "terminal.integrated.defaultProfile.linux": "zsh",
+                "workbench.editorAssociations": {
+                    "*.md": "vscode.markdown.preview"
+                }
+            }
+        }
+    },
+    "remoteUser": "root",
+    "postCreateCommand": "terraform --version && git --version"
+}
