@@ -5,6 +5,18 @@ Welcome to the comprehensive Terraform with Azure video course! This repository 
 ## 🎯 Course Overview
 This course consists of video lessons covering basic to advanced Terraform concepts with Azure cloud, including hands-on projects and real-world scenarios.
 
+Note: If you found the content helpful, consider giving the repository a star ⭐
+
+## 🔗 Join our community 👇
+
+
+<a href="https://youtube.com/@techtutorialswithpiyush"><img src="https://www.freeiconspng.com/thumbs/youtube-icon/video-youtube-icon--14.png" height="60px"></img></a>
+<a href="https://discord.com/invite/FMtJ2bVRUE"><img src="https://img.icons8.com/color/2x/discord--v2.png" height="60px"></img></a>
+<a href="https://github.com/piyushsachdeva/"><img src="https://user-images.githubusercontent.com/91791257/235086411-9ec7aa5e-c095-44ce-b9e6-57b3bc3fead2.png" height="60px"></img></a>
+<a href="https://twitter.com/thecloudopscomm"><img src="https://i.postimg.cc/pVqVTNJd/X-logo.png" height="60px"></img></a>
+<a href="https://www.linkedin.com/company/thecloudopscomm/"><img src="https://img.icons8.com/fluency/2x/linkedin.png" height="60px"></img></a>
+<a href="https://www.instagram.com/techtutorialswithpiyush/"><img src="https://user-images.githubusercontent.com/91791257/235086447-47658b7b-71fa-4baf-830a-3ba9b3a76a47.png" height="60px"></img></a>
+
 ## 📋 Prerequisites
 - Azure free account or subscription, follow this [video](https://youtu.be/bv3CWyaUeJI)
 - Azure Fundamentals [Video Link](https://youtu.be/-pX5PjIYTJs)
@@ -21,7 +33,7 @@ This course consists of video lessons covering basic to advanced Terraform conce
 
 ### Module 1: Core Concepts
 
-#### Day1: Introduction to Terraform
+#### Day1: [![Introduction to Terraform](https://img.youtube.com/vi/j0mfH_7sR7k/sddefault.jpg)](https://youtu.be/j0mfH_7sR7k)
 - Understanding Infrastructure as Code (IaC)
 - Why we need IaC
 - What is Terraform and its benefits
@@ -199,8 +211,9 @@ This course consists of video lessons covering basic to advanced Terraform conce
 - Best practices
 - [Code Sample](/lessons/day27)
 
-#### Video 28: AKS Upgrade with Zero Downtime (Real-time project 5)
-- Upgrade strategy
+#### Video 28:  Terraform end-to-end Project with AKS and GitOps (Real-time project 5)
+- Diagram and flow
+- Code walkthrough
 - Implementation
 - [Code Sample](/lessons/day28)
 
