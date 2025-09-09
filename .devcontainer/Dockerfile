@@ -8,12 +8,6 @@ RUN microdnf install -y \
     jq \
     && microdnf clean all
 
-# Install AWS CLI v2 (binary version)
-RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
-    unzip awscliv2.zip && \
-    ./aws/install && \
-    rm -rf aws awscliv2.zip
-
 # Install Azure CLI (RPM direct installation)
 RUN microdnf install -y dnf && \
     rpm --import https://packages.microsoft.com/keys/microsoft.asc && \
