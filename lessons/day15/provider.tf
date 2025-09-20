@@ -16,5 +16,10 @@ terraform {
 # configures the provider
 
 provider "azurerm" {
-  features {}
+  subscription_id = "c12c9f13-38c0-45db-9408-98f2982a27d0"
+  features {
+    resource_group {
+      prevent_deletion_if_contains_resources = false
+    }
+  }
 }
